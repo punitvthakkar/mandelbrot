@@ -211,7 +211,7 @@ let state = {
     velocity: { x: 0, y: 0 },
     friction: 0.9,
     isAnimating: false,
-    drawerCollapsed: false,
+    drawerCollapsed: window.innerWidth < 768, // Collapsed by default on mobile
     onboardingStep: 0,
     onboardingVisible: true,
     tourActive: false,
@@ -692,7 +692,8 @@ canvas.addEventListener('touchmove', (e) => {
 
         if (lastTouchDistance > 0) {
             const delta = lastTouchDistance - distance;
-            handleZoom(delta * 5, centerX, centerY);
+            // Much more natural zoom speed for mobile
+            handleZoom(delta * 0.05, centerX, centerY);
         }
         lastTouchDistance = distance;
     }
@@ -958,5 +959,10 @@ window.addEventListener('resize', () => {
 updateLegendGradient();
 updateLocationStory('default');
 initOnboarding();
+
+// Apply drawer state for mobile
+if (state.drawerCollapsed) {
+    document.getElementById('controlDrawer').classList.add('collapsed');
+}
 
 animationFrameId = requestAnimationFrame(drawScene);
