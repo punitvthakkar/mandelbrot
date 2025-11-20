@@ -3,9 +3,10 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Mandelbrot Explorer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description"
+        content="Explore the infinite beauty of the Mandelbrot set with an immersive, interactive fractal viewer">
+    <title>Mandelbrot Explorer — Infinite Fractals</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,153 +16,205 @@
 <body>
     <!-- Ambient background layer -->
     <div class="ambient-layer"></div>
+
+    <!-- Main canvas - full viewport -->
     <canvas id="glCanvas"></canvas>
     <div class="canvas-vignette"></div>
 
-    <div class="ui-overlay">
-        <!-- Collapsible control drawer -->
-        <div class="control-drawer" id="controlDrawer">
-            <button class="drawer-toggle" id="drawerToggle" aria-label="Toggle controls">
-                <span class="toggle-icon">◀</span>
+    <!-- Floating control toggle button -->
+    <button class="control-toggle-fab" id="controlToggle" aria-label="Toggle controls">
+        <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <span class="fab-label">Controls</span>
+    </button>
+
+    <!-- Slide-in control panel (Desktop: from right, Mobile: from bottom) -->
+    <div class="control-panel" id="controlPanel">
+        <!-- Panel header with close button -->
+        <div class="panel-header">
+            <div class="panel-title-group">
+                <h1>Mandelbrot Explorer</h1>
+                <p class="subtitle">Journey into infinite complexity</p>
+            </div>
+            <button class="panel-close-btn" id="panelClose" aria-label="Close panel">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
             </button>
+        </div>
 
-            <div class="drawer-content">
-                <div class="drawer-header">
-                    <h1>Mandelbrot Explorer</h1>
-                    <p class="subtitle">Journey into infinite complexity</p>
-                </div>
+        <!-- Mobile drag handle -->
+        <div class="mobile-drag-handle"></div>
 
-                <div class="control-group">
-                    <label>Explore Locations</label>
-                    <select id="locationSelect" class="location-select">
-                        <option value="default">Home View — The full set</option>
-                        <option value="seahorse">Seahorse Valley — Delicate tendrils</option>
-                        <option value="elephant">Elephant Valley — Bulbous spirals</option>
-                        <option value="spiral">Triple Spiral — Hypnotic vortex</option>
-                        <option value="minibrot">Mini Mandelbrot — Fractal echo</option>
-                    </select>
-                </div>
-
-                <div class="control-group">
-                    <label>Color Palette</label>
-                    <div class="palette-selector">
-                        <button class="palette-btn active" data-palette="0" aria-label="Ocean Depth">
-                            <span class="palette-preview palette-0"></span>
-                            <span class="palette-label">Ocean</span>
-                        </button>
-                        <button class="palette-btn" data-palette="1" aria-label="Magma">
-                            <span class="palette-preview palette-1"></span>
-                            <span class="palette-label">Magma</span>
-                        </button>
-                        <button class="palette-btn" data-palette="2" aria-label="Aurora">
-                            <span class="palette-preview palette-2"></span>
-                            <span class="palette-label">Aurora</span>
-                        </button>
-                        <button class="palette-btn" data-palette="3" title="Golden Hour">
-                            <span class="palette-preview palette-3"></span>
-                            <span class="palette-label">Amber</span>
-                        </button>
-                        <button class="palette-btn" data-palette="4" title="Fractal Extreme (Texture)">
-                            <span class="palette-preview palette-4"></span>
-                            <span class="palette-label">Extreme</span>
-                        </button>
-                    </div>
-                    <div class="color-legend" id="colorLegend">
-                        <span class="legend-label">Escape speed</span>
-                        <div class="legend-gradient" id="legendGradient"></div>
-                    </div>
-                </div>
-
-                <div class="control-group">
-                    <label for="iterations">Detail Level: <span id="iterValue">500</span></label>
-                    <input type="range" id="iterations" min="100" max="2000" value="500" step="50">
-                    <small class="hint">Higher values reveal finer structures</small>
-                </div>
-
-                <div class="control-group">
-                    <label>Zoom Controls</label>
-                    <div class="zoom-controls">
-                        <button id="zoomInBtn" class="action-btn secondary" title="Zoom in (or scroll)">
-                            <span>+</span>
-                        </button>
-                        <button id="zoomOutBtn" class="action-btn secondary" title="Zoom out (or scroll)">
-                            <span>−</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="action-buttons">
-                    <button id="resetBtn" class="action-btn" title="Reset to home view">
-                        <span class="btn-icon">↺</span> Reset
+        <!-- Control sections -->
+        <div class="panel-content">
+            <!-- Quick actions -->
+            <div class="control-section quick-actions">
+                <div class="action-grid">
+                    <button id="resetBtn" class="action-btn primary" title="Reset to home view">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                            <path d="M21 3v5h-5"></path>
+                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                        </svg>
+                        <span>Reset</span>
                     </button>
-                    <button id="autoTourBtn" class="action-btn secondary" title="Auto-tour interesting locations">
-                        <span class="btn-icon">▶</span> <span id="tourLabel">Tour</span>
+                    <button id="screenshotBtn" class="action-btn secondary" title="Save current view">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                            </path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        <span>Save</span>
                     </button>
-                    <button id="screenshotBtn" class="action-btn secondary" title="Save current view as image">
-                        <span class="btn-icon">📷</span> Save
+                    <button id="fullscreenBtn" class="action-btn secondary" title="Toggle fullscreen">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path
+                                d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3">
+                            </path>
+                        </svg>
+                        <span id="fullscreenLabel">Full</span>
                     </button>
-                    <button id="fullscreenBtn" class="action-btn secondary" title="Toggle fullscreen (F)">
-                        <span class="btn-icon">⛶</span> <span id="fullscreenLabel">Full</span>
+                    <button id="autoTourBtn" class="action-btn secondary" title="Auto-tour locations">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        <span id="tourLabel">Tour</span>
                     </button>
                 </div>
             </div>
-        </div>
 
-        <!-- Location story panel -->
-        <div class="location-story" id="locationStory">
-            <h3 id="storyTitle">Home View</h3>
-            <p id="storyDescription">The complete Mandelbrot set in its iconic form</p>
-            <div class="story-meta">
-                <span id="storyCoords">Center: -0.75, 0.00</span>
-                <span id="storyZoom">Zoom: 1.0×</span>
+            <!-- Location presets -->
+            <div class="control-section">
+                <label class="section-label">Explore Locations</label>
+                <select id="locationSelect" class="styled-select">
+                    <option value="default">Home View — The full set</option>
+                    <option value="seahorse">Seahorse Valley — Delicate tendrils</option>
+                    <option value="elephant">Elephant Valley — Bulbous spirals</option>
+                    <option value="spiral">Triple Spiral — Hypnotic vortex</option>
+                    <option value="minibrot">Mini Mandelbrot — Fractal echo</option>
+                </select>
+            </div>
+
+            <!-- Color palette -->
+            <div class="control-section">
+                <label class="section-label">Color Palette</label>
+                <div class="palette-grid">
+                    <button class="palette-card active" data-palette="0" aria-label="Ocean Depth">
+                        <div class="palette-preview palette-0"></div>
+                        <span class="palette-name">Ocean</span>
+                    </button>
+                    <button class="palette-card" data-palette="1" aria-label="Magma">
+                        <div class="palette-preview palette-1"></div>
+                        <span class="palette-name">Magma</span>
+                    </button>
+                    <button class="palette-card" data-palette="2" aria-label="Aurora">
+                        <div class="palette-preview palette-2"></div>
+                        <span class="palette-name">Aurora</span>
+                    </button>
+                    <button class="palette-card" data-palette="3" aria-label="Amber">
+                        <div class="palette-preview palette-3"></div>
+                        <span class="palette-name">Amber</span>
+                    </button>
+                    <button class="palette-card" data-palette="4" aria-label="Extreme">
+                        <div class="palette-preview palette-4"></div>
+                        <span class="palette-name">Extreme</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Detail level -->
+            <div class="control-section">
+                <label class="section-label">
+                    <span>Detail Level</span>
+                    <span class="value-display" id="iterValue">500</span>
+                </label>
+                <input type="range" id="iterations" class="styled-range" min="100" max="2000" value="500" step="50">
+                <small class="hint-text">Higher values reveal finer structures</small>
+            </div>
+
+            <!-- Zoom controls -->
+            <div class="control-section">
+                <label class="section-label">Zoom</label>
+                <div class="zoom-btn-group">
+                    <button id="zoomOutBtn" class="zoom-btn" aria-label="Zoom out">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                    </button>
+                    <button id="zoomInBtn" class="zoom-btn" aria-label="Zoom in">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="16"></line>
+                            <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
-
-        <!-- Floating status puck -->
-        <div class="status-puck" id="statusPuck">
-            <div class="puck-item">
-                <span class="puck-label">X</span>
-                <span id="coordX">-0.75000</span>
-            </div>
-            <div class="puck-divider"></div>
-            <div class="puck-item">
-                <span class="puck-label">Y</span>
-                <span id="coordY">0.00000</span>
-            </div>
-            <div class="puck-divider"></div>
-            <div class="puck-item">
-                <span class="puck-label">Z</span>
-                <span id="zoomLevel">1.0×</span>
-            </div>
-        </div>
-
-        <!-- Contextual hint ribbon -->
-        <div class="hint-ribbon" id="hintRibbon">
-            <span class="hint-item"><kbd>Drag</kbd> to pan</span>
-            <span class="hint-item"><kbd>Scroll</kbd> to zoom</span>
-            <span class="hint-item"><kbd>Double-click</kbd> to focus</span>
-            <span class="hint-item"><kbd>H</kbd> help</span>
-            <span class="hint-item"><kbd>R</kbd> reset</span>
-            <span class="hint-item"><kbd>F</kbd> fullscreen</span>
-        </div>
-
-        <!-- Onboarding tooltip -->
-        <div class="onboarding-tooltip" id="onboardingTooltip">
-            <button class="tooltip-close" id="tooltipClose" aria-label="Close">×</button>
-            <div class="tooltip-content" id="tooltipContent">
-                <h4 id="tooltipTitle">Welcome!</h4>
-                <p id="tooltipText">Drag to explore, scroll to zoom into infinite detail.</p>
-            </div>
-            <div class="tooltip-nav">
-                <button class="tooltip-btn" id="tooltipPrev">←</button>
-                <span class="tooltip-dots" id="tooltipDots"></span>
-                <button class="tooltip-btn" id="tooltipNext">→</button>
-            </div>
-        </div>
-
-        <!-- Zoom focus ring -->
-        <div class="zoom-focus-ring" id="zoomFocusRing"></div>
     </div>
+
+    <!-- Status display (bottom-left) -->
+    <div class="status-display" id="statusDisplay">
+        <div class="status-item">
+            <span class="status-label">X</span>
+            <span class="status-value" id="coordX">-0.75000</span>
+        </div>
+        <div class="status-divider"></div>
+        <div class="status-item">
+            <span class="status-label">Y</span>
+            <span class="status-value" id="coordY">0.00000</span>
+        </div>
+        <div class="status-divider"></div>
+        <div class="status-item">
+            <span class="status-label">Z</span>
+            <span class="status-value" id="zoomLevel">1.0×</span>
+        </div>
+    </div>
+
+    <!-- Location info overlay (top-center) -->
+    <div class="location-info" id="locationInfo">
+        <h3 id="locationTitle">Home View</h3>
+        <p id="locationDescription">The complete Mandelbrot set in its iconic form</p>
+    </div>
+
+    <!-- Gesture tutorial overlay (mobile first-time) -->
+    <div class="gesture-tutorial" id="gestureTutorial">
+        <button class="tutorial-close" id="tutorialClose" aria-label="Close tutorial">×</button>
+        <div class="tutorial-content">
+            <h2 id="tutorialTitle">Welcome!</h2>
+            <p id="tutorialText">Drag to explore, pinch to zoom into infinite detail.</p>
+            <div class="tutorial-gestures">
+                <div class="gesture-hint">
+                    <div class="gesture-icon">👆</div>
+                    <span>Tap to explore</span>
+                </div>
+                <div class="gesture-hint">
+                    <div class="gesture-icon">🤏</div>
+                    <span>Pinch to zoom</span>
+                </div>
+                <div class="gesture-hint">
+                    <div class="gesture-icon">👇</div>
+                    <span>Double-tap to focus</span>
+                </div>
+            </div>
+            <button class="tutorial-btn" id="tutorialNext">Get Started</button>
+        </div>
+    </div>
+
+    <!-- Zoom focus ring -->
+    <div class="zoom-focus-ring" id="zoomFocusRing"></div>
 
     <script src="script.js"></script>
 </body>

@@ -16,8 +16,8 @@ const fsSource = `
     uniform vec2 u_zoomSize;
     uniform int u_maxIterations;
     uniform int u_paletteId;
-    uniform bool u_highPrecision; // Toggle for optimization
-    uniform sampler2D u_paletteTexture; // For Fractal Extreme mode
+    uniform bool u_highPrecision;
+    uniform sampler2D u_paletteTexture;
 
     // Emulated double math functions
     vec2 ds_add(vec2 dsa, vec2 dsb) {
@@ -72,10 +72,6 @@ const fsSource = `
         return dsc;
     }
 
-    vec2 ds_set(float a) {
-        return vec2(a, 0.0);
-    }
-
     vec3 palette( float t, vec3 a, vec3 b, vec3 c, vec3 d ) {
         return a + b*cos( 6.28318*(c*t+d) );
     }
@@ -83,15 +79,10 @@ const fsSource = `
     void main() {
         vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / u_resolution.y;
         
-        // --- Cardioid & Bulb Check (Optimization) ---
-        // Only works roughly if we are zoomed out, but good for general speedup
-        // We'll skip this for simplicity in deep zoom as it might cause artifacts if not precise
-        
         float iterations = 0.0;
         bool escaped = false;
 
         if (u_highPrecision) {
-             // --- HIGH PRECISION MODE (Double Emulation) ---
             vec2 uv_x_ds = vec2(uv.x, 0.0);
             vec2 uv_y_ds = vec2(uv.y, 0.0);
 
@@ -125,16 +116,13 @@ const fsSource = `
                 z_y = new_y;
             }
         } else {
-            // --- LOW PRECISION MODE (Standard Float) ---
-            // Much faster!
             vec2 c = vec2(u_zoomCenter_x.x, u_zoomCenter_y.x) + uv * u_zoomSize.x;
             
-            // Cardioid Check
             float p = sqrt((c.x - 0.25) * (c.x - 0.25) + c.y * c.y);
             if (c.x < p - 2.0 * p * p + 0.25) {
-                iterations = float(u_maxIterations); // Inside
+                iterations = float(u_maxIterations);
             } else if ((c.x + 1.0) * (c.x + 1.0) + c.y * c.y < 0.0625) {
-                iterations = float(u_maxIterations); // Inside bulb
+                iterations = float(u_maxIterations);
             } else {
                 vec2 z = vec2(0.0);
                 for (int i = 0; i < 10000; i++) {
@@ -155,30 +143,19 @@ const fsSource = `
         }
 
         if (escaped) {
-            // Smooth coloring
-            // float sl = iterations - log2(log2(dot(z,z))) + 4.0; // Requires z from loop, tricky with branching
-            // Simple linear smoothing for now to match both modes
             float t = iterations / float(u_maxIterations);
-            
             vec3 color = vec3(0.0);
 
             if (u_paletteId == 0) {
-                // Electric Blue (Refined)
                 color = palette(t, vec3(0.5), vec3(0.5), vec3(1.0), vec3(0.00, 0.10, 0.20));
             } else if (u_paletteId == 1) {
-                // Fire & Ice (Refined)
                 color = palette(t, vec3(0.5), vec3(0.5), vec3(1.0, 1.0, 0.5), vec3(0.8, 0.9, 0.3));
                 color = mix(vec3(0.1, 0.0, 0.0), color, t);
             } else if (u_paletteId == 2) {
-                // Neon Night (Refined)
                 color = palette(t, vec3(0.5), vec3(0.5), vec3(2.0, 1.0, 0.0), vec3(0.5, 0.20, 0.25));
             } else if (u_paletteId == 3) {
-                // Golden Hour (Refined)
                 color = palette(t, vec3(0.8, 0.5, 0.4), vec3(0.2, 0.4, 0.2), vec3(2.0, 1.0, 1.0), vec3(0.00, 0.25, 0.25));
             } else {
-                // Fractal Extreme (Texture)
-                // Sample texture with smooth, gradual color progression
-                // Use a longer cycle for more gradual color transitions
                 float cycle = mod(iterations, 512.0) / 512.0;
                 color = texture2D(u_paletteTexture, vec2(cycle, 0.5)).rgb;
             }
@@ -198,6 +175,22 @@ if (!gl) {
     alert('Unable to initialize WebGL. Your browser or machine may not support it.');
 }
 
+// Detect screen type for context-aware zoom
+function getScreenContext() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const isMobile = width < 768;
+    const isSmall = width < 480;
+
+    return {
+        isMobile,
+        isSmall,
+        width,
+        height,
+        aspectRatio: width / height
+    };
+}
+
 // State
 let state = {
     zoomCenter: { x: -0.75, y: 0.0 },
@@ -211,14 +204,13 @@ let state = {
     velocity: { x: 0, y: 0 },
     friction: 0.9,
     isAnimating: false,
-    drawerCollapsed: window.innerWidth < 768, // Collapsed by default on mobile
-    onboardingStep: 0,
-    onboardingVisible: true,
+    panelVisible: false,
     tourActive: false,
     tourStep: 0,
     lastStatsUpdate: 0,
     statsUpdateInterval: 100,
-    lastUniformValues: {}
+    autoHideTimer: null,
+    tutorialShown: localStorage.getItem('mandelbrot_tutorial_shown') === 'true'
 };
 
 const locations = {
@@ -249,29 +241,6 @@ const locations = {
     }
 };
 
-const onboardingSteps = [
-    {
-        title: 'Welcome!',
-        text: 'Explore the infinite beauty of the Mandelbrot set. Drag to pan around the fractal.'
-    },
-    {
-        title: 'Zoom In',
-        text: 'Scroll your mouse wheel or use the zoom buttons to dive deeper into the fractal.'
-    },
-    {
-        title: 'Double-Click',
-        text: 'Double-click anywhere to zoom toward that point for precise exploration.'
-    },
-    {
-        title: 'Keyboard Shortcuts',
-        text: 'Press H for help, R to reset, F for fullscreen. Check the bottom for more shortcuts!'
-    },
-    {
-        title: 'Ready to Explore!',
-        text: 'Try the location presets or take the auto-tour. Enjoy your journey!'
-    }
-];
-
 // Shader Program Setup
 function loadShader(gl, type, source) {
     const shader = gl.createShader(type);
@@ -279,9 +248,7 @@ function loadShader(gl, type, source) {
     gl.compileShader(shader);
 
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        const info = gl.getShaderInfoLog(shader);
-        console.error('Shader compilation error:', info);
-        console.error('Shader type:', type === gl.VERTEX_SHADER ? 'VERTEX' : 'FRAGMENT');
+        console.error('Shader compilation error:', gl.getShaderInfoLog(shader));
         gl.deleteShader(shader);
         return null;
     }
@@ -304,12 +271,10 @@ function initShaderProgram(gl, vsSource, fsSource) {
     gl.linkProgram(shaderProgram);
 
     if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-        const info = gl.getProgramInfoLog(shaderProgram);
-        console.error('Shader program linking error:', info);
+        console.error('Shader program linking error:', gl.getProgramInfoLog(shaderProgram));
         return null;
     }
 
-    console.log('Shaders compiled and linked successfully');
     return shaderProgram;
 }
 
@@ -336,42 +301,37 @@ const programInfo = shaderProgram ? {
     },
 } : null;
 
-// --- Texture Palette Generation ---
+// Texture Palette Generation
 function generateFractalExtremePalette() {
-    // Create a beautiful, smooth gradient using curated color stops
-    // This creates a rich, vibrant palette without harsh transitions
     const colorStops = [
-        { pos: 0.00, r: 0, g: 0, b: 0 },           // Deep black
-        { pos: 0.05, r: 25, g: 7, b: 26 },         // Deep purple
-        { pos: 0.10, r: 9, g: 1, b: 47 },          // Deep blue
-        { pos: 0.15, r: 4, g: 4, b: 73 },          // Dark blue
-        { pos: 0.20, r: 0, g: 7, b: 100 },         // Ocean blue
-        { pos: 0.25, r: 12, g: 44, b: 138 },       // Rich blue
-        { pos: 0.30, r: 24, g: 82, b: 177 },       // Sky blue
-        { pos: 0.35, r: 57, g: 125, b: 209 },      // Bright blue
-        { pos: 0.40, r: 134, g: 181, b: 229 },     // Light blue
-        { pos: 0.45, r: 211, g: 236, b: 248 },     // Pale blue
-        { pos: 0.50, r: 241, g: 233, b: 191 },     // Soft yellow
-        { pos: 0.55, r: 248, g: 201, b: 95 },      // Golden
-        { pos: 0.60, r: 255, g: 170, b: 0 },       // Orange
-        { pos: 0.65, r: 240, g: 126, b: 13 },      // Deep orange
-        { pos: 0.70, r: 204, g: 71, b: 10 },       // Red-orange
-        { pos: 0.75, r: 158, g: 1, b: 66 },        // Deep red
-        { pos: 0.80, r: 110, g: 0, b: 95 },        // Purple-red
-        { pos: 0.85, r: 106, g: 0, b: 168 },       // Purple
-        { pos: 0.90, r: 77, g: 16, b: 140 },       // Deep purple
-        { pos: 0.95, r: 45, g: 20, b: 80 },        // Dark purple
-        { pos: 1.00, r: 0, g: 0, b: 0 }            // Back to black
+        { pos: 0.00, r: 0, g: 0, b: 0 },
+        { pos: 0.05, r: 25, g: 7, b: 26 },
+        { pos: 0.10, r: 9, g: 1, b: 47 },
+        { pos: 0.15, r: 4, g: 4, b: 73 },
+        { pos: 0.20, r: 0, g: 7, b: 100 },
+        { pos: 0.25, r: 12, g: 44, b: 138 },
+        { pos: 0.30, r: 24, g: 82, b: 177 },
+        { pos: 0.35, r: 57, g: 125, b: 209 },
+        { pos: 0.40, r: 134, g: 181, b: 229 },
+        { pos: 0.45, r: 211, g: 236, b: 248 },
+        { pos: 0.50, r: 241, g: 233, b: 191 },
+        { pos: 0.55, r: 248, g: 201, b: 95 },
+        { pos: 0.60, r: 255, g: 170, b: 0 },
+        { pos: 0.65, r: 240, g: 126, b: 13 },
+        { pos: 0.70, r: 204, g: 71, b: 10 },
+        { pos: 0.75, r: 158, g: 1, b: 66 },
+        { pos: 0.80, r: 110, g: 0, b: 95 },
+        { pos: 0.85, r: 106, g: 0, b: 168 },
+        { pos: 0.90, r: 77, g: 16, b: 140 },
+        { pos: 0.95, r: 45, g: 20, b: 80 },
+        { pos: 1.00, r: 0, g: 0, b: 0 }
     ];
 
-    // Create a 2048-pixel texture for super smooth gradients
     const textureSize = 2048;
     const textureData = new Uint8Array(textureSize * 4);
 
     for (let i = 0; i < textureSize; i++) {
         const t = i / (textureSize - 1);
-
-        // Find the two color stops to interpolate between
         let lower = colorStops[0];
         let upper = colorStops[colorStops.length - 1];
 
@@ -383,32 +343,27 @@ function generateFractalExtremePalette() {
             }
         }
 
-        // Smooth interpolation between color stops
         const localT = (t - lower.pos) / (upper.pos - lower.pos);
-        const smoothT = localT * localT * (3 - 2 * localT); // Smoothstep
+        const smoothT = localT * localT * (3 - 2 * localT);
 
         textureData[i * 4 + 0] = Math.round(lower.r + (upper.r - lower.r) * smoothT);
         textureData[i * 4 + 1] = Math.round(lower.g + (upper.g - lower.g) * smoothT);
         textureData[i * 4 + 2] = Math.round(lower.b + (upper.b - lower.b) * smoothT);
-        textureData[i * 4 + 3] = 255; // Alpha
+        textureData[i * 4 + 3] = 255;
     }
 
     return textureData;
 }
 
-// Create and upload texture
 const paletteTexture = gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
 const textureData = generateFractalExtremePalette();
 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2048, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, textureData);
-
-// Texture parameters
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-// Helper to split double into two floats
 function splitDouble(value) {
     const hi = Math.fround(value);
     const lo = value - hi;
@@ -426,18 +381,16 @@ const positions = [
 ];
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
-// Time for animation
 let lastTime = 0;
 
 // Rendering
 function drawScene(timestamp) {
     if (!lastTime) lastTime = timestamp;
-    const deltaTime = (timestamp - lastTime) / 1000; // Seconds
+    const deltaTime = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
 
-    // Inertia / Momentum (Time-based)
     if (!state.isDragging && !state.isAnimating) {
-        state.targetZoomCenter.x -= state.velocity.x * deltaTime * 60; // Normalize to ~60fps scale
+        state.targetZoomCenter.x -= state.velocity.x * deltaTime * 60;
         state.targetZoomCenter.y -= state.velocity.y * deltaTime * 60;
 
         state.velocity.x *= Math.pow(state.friction, deltaTime * 60);
@@ -448,8 +401,7 @@ function drawScene(timestamp) {
         }
     }
 
-    // Smooth interpolation (Time-based)
-    const lerpFactor = 1.0 - Math.pow(0.1, deltaTime * 10); // Tuned for smoothness
+    const lerpFactor = 1.0 - Math.pow(0.1, deltaTime * 10);
 
     state.zoomSize += (state.targetZoomSize - state.zoomSize) * lerpFactor;
     state.zoomCenter.x += (state.targetZoomCenter.x - state.zoomCenter.x) * lerpFactor;
@@ -473,12 +425,6 @@ function drawScene(timestamp) {
     const centerYSplit = splitDouble(state.zoomCenter.y);
     const zoomSizeSplit = splitDouble(state.zoomSize);
 
-    // Assuming zoomSizeKey was meant to be a unique identifier for the current view state
-    // For continuous animation, we always update uniforms and draw.
-    // The original code's `if (state.lastUniformValues.zoomSize !== zoomSizeKey)`
-    // was likely an optimization attempt, but moving drawArrays inside it would halt animation.
-    // We'll apply the uniform updates directly.
-
     gl.uniform2f(programInfo.uniformLocations.zoomCenterX, centerXSplit[0], centerXSplit[1]);
     gl.uniform2f(programInfo.uniformLocations.zoomCenterY, centerYSplit[0], centerYSplit[1]);
     gl.uniform2f(programInfo.uniformLocations.zoomSize, zoomSizeSplit[0], zoomSizeSplit[1]);
@@ -486,12 +432,9 @@ function drawScene(timestamp) {
     gl.uniform1i(programInfo.uniformLocations.maxIterations, state.maxIterations);
     gl.uniform1i(programInfo.uniformLocations.paletteId, state.paletteId);
 
-    // Dynamic Precision Switch
-    // Standard float has ~7 decimal digits. If zoomSize < 0.001, we need double.
     const highPrecision = state.zoomSize < 0.001;
     gl.uniform1i(programInfo.uniformLocations.highPrecision, highPrecision ? 1 : 0);
 
-    // Bind Texture
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
     gl.uniform1i(programInfo.uniformLocations.paletteTexture, 0);
@@ -502,18 +445,10 @@ function drawScene(timestamp) {
     requestAnimationFrame(drawScene);
 }
 
-document.addEventListener('visibilitychange', () => {
-    isPageVisible = !document.hidden;
-    if (isPageVisible && !animationFrameId) {
-        animationFrameId = requestAnimationFrame(drawScene);
-    }
-});
-
 function resizeCanvasToDisplaySize(canvas) {
     const displayWidth = canvas.clientWidth;
     const displayHeight = canvas.clientHeight;
-    if (canvas.width !== displayWidth ||
-        canvas.height !== displayHeight) {
+    if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
         canvas.width = displayWidth;
         canvas.height = displayHeight;
     }
@@ -529,38 +464,35 @@ function updateStats() {
     document.getElementById('zoomLevel').innerText = `${(3.0 / state.zoomSize).toFixed(1)}×`;
 }
 
-function updateLocationStory(locationKey) {
+function updateLocationInfo(locationKey) {
     const loc = locations[locationKey];
     if (!loc) return;
 
-    document.getElementById('storyTitle').innerText = loc.title;
-    document.getElementById('storyDescription').innerText = loc.description;
-    document.getElementById('storyCoords').innerText = `Center: ${loc.x.toFixed(3)}, ${loc.y.toFixed(2)}`;
-    document.getElementById('storyZoom').innerText = `Zoom: ${(3.0 / loc.size).toFixed(1)}×`;
+    document.getElementById('locationTitle').innerText = loc.title;
+    document.getElementById('locationDescription').innerText = loc.description;
 
-    const storyPanel = document.getElementById('locationStory');
-    storyPanel.classList.add('visible');
+    const infoPanel = document.getElementById('locationInfo');
+    infoPanel.classList.add('visible');
 
     setTimeout(() => {
-        storyPanel.classList.remove('visible');
-    }, 5000);
+        infoPanel.classList.remove('visible');
+    }, 4000);
 }
 
-function updateLegendGradient() {
-    const gradients = [
-        'linear-gradient(90deg, #001133 0%, #006699 50%, #eef 100%)',
-        'linear-gradient(90deg, #220011 0%, #cc4400 40%, #ffeeaa 100%)',
-        'linear-gradient(90deg, #002211 0%, #00aa88 50%, #ccffdd 100%)',
-        'linear-gradient(90deg, #331100 0%, #cc8822 50%, #ffeedd 100%)'
-    ];
-    document.getElementById('legendGradient').style.background = gradients[state.paletteId];
-}
-
+// Context-aware zoom with screen size adaptation
 function handleZoom(delta, x, y) {
-    // Dynamic zoom factor: slows down as you zoom in (size decreases)
-    // At size 3.0 (start): factor ~ 1.2
-    // At size 0.00003 (limit): factor ~ 1.006
-    const zoomFactor = 1.0 + 0.15 * Math.pow(state.targetZoomSize, 0.3);
+    const screenCtx = getScreenContext();
+
+    // Base zoom factor varies by screen size and current zoom level
+    let baseFactor = 0.15;
+
+    // Mobile gets slower, more controlled zoom
+    if (screenCtx.isMobile) {
+        baseFactor = screenCtx.isSmall ? 0.08 : 0.10;
+    }
+
+    // Progressive slowdown as we zoom in (exponential)
+    const zoomFactor = 1.0 + baseFactor * Math.pow(state.targetZoomSize, 0.3);
 
     if (x === undefined || y === undefined) {
         x = canvas.width / 2;
@@ -583,6 +515,7 @@ function handleZoom(delta, x, y) {
     state.targetZoomCenter.y = wy - uvy * state.targetZoomSize;
 }
 
+// Mouse/Touch Interactions
 canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     const delta = Math.sign(e.deltaY);
@@ -656,12 +589,14 @@ window.addEventListener('mousemove', (e) => {
     state.lastMouse = { x: e.clientX, y: e.clientY };
 });
 
+// Touch support with improved mobile handling
 let lastTouchDistance = 0;
 
 canvas.addEventListener('touchstart', (e) => {
     if (e.touches.length === 1) {
         state.isDragging = true;
         state.lastMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        state.velocity = { x: 0, y: 0 };
     } else if (e.touches.length === 2) {
         state.isDragging = false;
         const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -672,6 +607,7 @@ canvas.addEventListener('touchstart', (e) => {
 
 canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
+
     if (e.touches.length === 1 && state.isDragging) {
         const dx = e.touches[0].clientX - state.lastMouse.x;
         const dy = e.touches[0].clientY - state.lastMouse.y;
@@ -680,6 +616,9 @@ canvas.addEventListener('touchmove', (e) => {
 
         state.targetZoomCenter.x -= dx * scale;
         state.targetZoomCenter.y += dy * scale;
+
+        state.velocity.x = dx * scale * 2.0;
+        state.velocity.y = dy * scale * 2.0;
 
         state.lastMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     } else if (e.touches.length === 2) {
@@ -692,29 +631,86 @@ canvas.addEventListener('touchmove', (e) => {
 
         if (lastTouchDistance > 0) {
             const delta = lastTouchDistance - distance;
-            // Much more natural zoom speed for mobile
-            handleZoom(delta * 0.05, centerX, centerY);
+            const screenCtx = getScreenContext();
+
+            // Adaptive zoom sensitivity for mobile
+            const zoomStrength = screenCtx.isMobile ? 0.003 : 0.005;
+
+            const uvx = (centerX - canvas.width / 2) / canvas.height;
+            const uvy = (canvas.height - centerY - canvas.height / 2) / canvas.height;
+
+            const wx = state.targetZoomCenter.x + uvx * state.targetZoomSize;
+            const wy = state.targetZoomCenter.y + uvy * state.targetZoomSize;
+
+            if (delta > 0) {
+                state.targetZoomSize *= (1 + delta * zoomStrength);
+            } else {
+                state.targetZoomSize /= (1 - delta * zoomStrength);
+            }
+
+            state.targetZoomCenter.x = wx - uvx * state.targetZoomSize;
+            state.targetZoomCenter.y = wy - uvy * state.targetZoomSize;
         }
         lastTouchDistance = distance;
     }
 }, { passive: false });
 
-document.getElementById('drawerToggle').addEventListener('click', () => {
-    state.drawerCollapsed = !state.drawerCollapsed;
-    document.getElementById('controlDrawer').classList.toggle('collapsed', state.drawerCollapsed);
+canvas.addEventListener('touchend', (e) => {
+    if (e.touches.length === 0) {
+        state.isDragging = false;
+    }
 });
 
+// UI Controls - Panel Toggle with Auto-Hide
+function togglePanel(forceState) {
+    state.panelVisible = forceState !== undefined ? forceState : !state.panelVisible;
+
+    const panel = document.getElementById('controlPanel');
+    const fab = document.getElementById('controlToggle');
+
+    panel.classList.toggle('visible', state.panelVisible);
+    fab.classList.toggle('hidden', state.panelVisible);
+
+    // Reset auto-hide timer
+    clearTimeout(state.autoHideTimer);
+
+    if (state.panelVisible) {
+        state.autoHideTimer = setTimeout(() => {
+            togglePanel(false);
+        }, 10000); // Auto-hide after 10 seconds
+    }
+}
+
+// Tap canvas to show controls if hidden
+canvas.addEventListener('click', () => {
+    if (!state.panelVisible && !state.isDragging) {
+        const screenCtx = getScreenContext();
+        if (screenCtx.isMobile) {
+            // Only on mobile, single tap shows controls
+            togglePanel(true);
+        }
+    }
+});
+
+document.getElementById('controlToggle').addEventListener('click', () => {
+    togglePanel();
+});
+
+document.getElementById('panelClose').addEventListener('click', () => {
+    togglePanel(false);
+});
+
+// Control interactions
 document.getElementById('iterations').addEventListener('input', (e) => {
     state.maxIterations = parseInt(e.target.value);
     document.getElementById('iterValue').innerText = state.maxIterations;
 });
 
-document.querySelectorAll('.palette-btn').forEach(btn => {
+document.querySelectorAll('.palette-card').forEach(btn => {
     btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.palette-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.palette-card').forEach(b => b.classList.remove('active'));
         e.currentTarget.classList.add('active');
         state.paletteId = parseInt(e.currentTarget.dataset.palette);
-        updateLegendGradient();
     });
 });
 
@@ -727,7 +723,7 @@ document.getElementById('locationSelect').addEventListener('change', (e) => {
         state.targetZoomCenter = { x: loc.x, y: loc.y };
         state.targetZoomSize = loc.size;
 
-        updateLocationStory(e.target.value);
+        updateLocationInfo(e.target.value);
 
         setTimeout(() => { state.isAnimating = false; }, 1000);
     }
@@ -738,7 +734,7 @@ document.getElementById('resetBtn').addEventListener('click', () => {
     state.targetZoomSize = 3.0;
     state.velocity = { x: 0, y: 0 };
     document.getElementById('locationSelect').value = 'default';
-    updateLocationStory('default');
+    updateLocationInfo('default');
 });
 
 document.getElementById('screenshotBtn').addEventListener('click', () => {
@@ -755,7 +751,7 @@ document.getElementById('fullscreenBtn').addEventListener('click', () => {
 function toggleFullscreen() {
     if (!document.fullscreenElement) {
         document.body.requestFullscreen().catch(err => {
-            console.error(`Error attempting to enable fullscreen: ${err.message}`);
+            console.error(`Fullscreen error: ${err.message}`);
         });
         document.getElementById('fullscreenLabel').innerText = 'Exit';
     } else {
@@ -764,17 +760,13 @@ function toggleFullscreen() {
     }
 }
 
+// Zoom buttons
 let zoomInterval = null;
-let zoomAcceleration = 1;
 
 function startZoom(direction) {
-    zoomAcceleration = 1;
     handleZoom(direction);
     zoomInterval = setInterval(() => {
-        zoomAcceleration = Math.min(zoomAcceleration * 1.05, 3);
-        for (let i = 0; i < zoomAcceleration; i++) {
-            handleZoom(direction);
-        }
+        handleZoom(direction);
     }, 50);
 }
 
@@ -782,7 +774,6 @@ function stopZoom() {
     if (zoomInterval) {
         clearInterval(zoomInterval);
         zoomInterval = null;
-        zoomAcceleration = 1;
     }
 }
 
@@ -804,10 +795,14 @@ document.getElementById('zoomOutBtn').addEventListener('touchstart', (e) => {
 });
 document.getElementById('zoomOutBtn').addEventListener('touchend', stopZoom);
 
+// Keyboard shortcuts (desktop only)
 document.addEventListener('keydown', (e) => {
+    const screenCtx = getScreenContext();
+    if (screenCtx.isMobile) return; // Disable keyboard shortcuts on mobile
+
     switch (e.key.toLowerCase()) {
-        case 'h':
-            toggleOnboarding();
+        case 'c':
+            togglePanel();
             break;
         case 'r':
             document.getElementById('resetBtn').click();
@@ -819,84 +814,12 @@ document.addEventListener('keydown', (e) => {
             document.getElementById('autoTourBtn').click();
             break;
         case 'escape':
-            if (state.onboardingVisible) {
-                closeOnboarding();
-            }
-            if (state.tourActive) {
-                stopTour();
-            }
-            break;
-        case '+':
-        case '=':
-            handleZoom(-1);
-            break;
-        case '-':
-        case '_':
-            handleZoom(1);
+            togglePanel(false);
             break;
     }
 });
 
-function initOnboarding() {
-    const tooltip = document.getElementById('onboardingTooltip');
-    const dotsContainer = document.getElementById('tooltipDots');
-
-    onboardingSteps.forEach((_, i) => {
-        const dot = document.createElement('span');
-        dot.className = 'tooltip-dot';
-        if (i === 0) dot.classList.add('active');
-        dotsContainer.appendChild(dot);
-    });
-
-    updateOnboardingStep(0);
-
-    setTimeout(() => {
-        tooltip.classList.add('visible');
-    }, 1000);
-}
-
-function updateOnboardingStep(step) {
-    state.onboardingStep = step;
-    const stepData = onboardingSteps[step];
-
-    document.getElementById('tooltipTitle').innerText = stepData.title;
-    document.getElementById('tooltipText').innerText = stepData.text;
-
-    document.querySelectorAll('.tooltip-dot').forEach((dot, i) => {
-        dot.classList.toggle('active', i === step);
-    });
-
-    document.getElementById('tooltipPrev').disabled = step === 0;
-    document.getElementById('tooltipNext').disabled = step === onboardingSteps.length - 1;
-}
-
-function toggleOnboarding() {
-    state.onboardingVisible = !state.onboardingVisible;
-    const tooltip = document.getElementById('onboardingTooltip');
-    tooltip.classList.toggle('visible', state.onboardingVisible);
-}
-
-function closeOnboarding() {
-    state.onboardingVisible = false;
-    document.getElementById('onboardingTooltip').classList.remove('visible');
-}
-
-document.getElementById('tooltipClose').addEventListener('click', closeOnboarding);
-
-document.getElementById('tooltipPrev').addEventListener('click', () => {
-    if (state.onboardingStep > 0) {
-        updateOnboardingStep(state.onboardingStep - 1);
-    }
-});
-
-document.getElementById('tooltipNext').addEventListener('click', () => {
-    if (state.onboardingStep < onboardingSteps.length - 1) {
-        updateOnboardingStep(state.onboardingStep + 1);
-    } else {
-        closeOnboarding();
-    }
-});
-
+// Auto Tour
 const tourLocations = ['default', 'seahorse', 'elephant', 'spiral', 'minibrot'];
 let tourTimeout = null;
 
@@ -930,7 +853,7 @@ function tourNextLocation() {
     state.targetZoomSize = loc.size;
 
     document.getElementById('locationSelect').value = locationKey;
-    updateLocationStory(locationKey);
+    updateLocationInfo(locationKey);
 
     state.tourStep = (state.tourStep + 1) % tourLocations.length;
 
@@ -948,6 +871,27 @@ document.getElementById('autoTourBtn').addEventListener('click', () => {
     }
 });
 
+// Gesture Tutorial (mobile first-time)
+function showTutorial() {
+    const tutorial = document.getElementById('gestureTutorial');
+    tutorial.classList.add('visible');
+}
+
+function hideTutorial() {
+    const tutorial = document.getElementById('gestureTutorial');
+    tutorial.classList.remove('visible');
+    localStorage.setItem('mandelbrot_tutorial_shown', 'true');
+}
+
+document.getElementById('tutorialClose').addEventListener('click', hideTutorial);
+document.getElementById('tutorialNext').addEventListener('click', hideTutorial);
+
+// Show tutorial on first mobile visit
+if (!state.tutorialShown && getScreenContext().isMobile) {
+    setTimeout(showTutorial, 1500);
+}
+
+// Window resize handler with debouncing
 let resizeTimeout = null;
 window.addEventListener('resize', () => {
     if (resizeTimeout) clearTimeout(resizeTimeout);
@@ -956,13 +900,8 @@ window.addEventListener('resize', () => {
     }, 150);
 });
 
-updateLegendGradient();
-updateLocationStory('default');
-initOnboarding();
+// Initialize
+updateLocationInfo('default');
 
-// Apply drawer state for mobile
-if (state.drawerCollapsed) {
-    document.getElementById('controlDrawer').classList.add('collapsed');
-}
-
-animationFrameId = requestAnimationFrame(drawScene);
+// Start rendering
+requestAnimationFrame(drawScene);
