@@ -105,7 +105,7 @@ const fsSource = `
                     iterations = float(i);
                     // Calculate log_zn for smoothing
                     // |z|^2 = z_x2.x + z_y2.x (approx for high precision)
-                    log_zn = log(z_x2.x + z_y2.x) / 2.0;
+                    log_zn = log2(z_x2.x + z_y2.x) / 2.0;
                     break;
                 }
 
@@ -139,7 +139,7 @@ const fsSource = `
                     if (x * x + y * y > 4.0) {
                         escaped = true;
                         iterations = float(i);
-                        log_zn = log(x * x + y * y) / 2.0;
+                        log_zn = log2(x * x + y * y) / 2.0;
                         break;
                     }
                     z.x = x;
@@ -150,9 +150,9 @@ const fsSource = `
 
         if (escaped) {
             // Continuous iteration count smoothing
-            // nu = log2(log2(|z|)) / log2(2)
-            // log_zn is already log(|z|) = log(|z|^2)/2
-            float nu = log(log_zn / log(2.0)) / log(2.0);
+            // nu = log2(log2(|z|))
+            // log_zn is log2(|z|)
+            float nu = log2(log_zn);
             
             // Smooth iteration count
             float smooth_i = iterations + 1.0 - nu;
