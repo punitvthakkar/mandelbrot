@@ -693,6 +693,123 @@ canvas.addEventListener('touchend', (e) => {
     }
 });
 
+// --- Fidget Zoom Switch Logic ---
+const fidgetTrack = document.getElementById('fidgetTrack');
+const fidgetKnob = document.getElementById('fidgetKnob');
+const fidgetInput = document.getElementById('fidgetInput');
+const lockZoneOut = document.getElementById('lockZoneOut');
+const lockZoneIn = document.getElementById('lockZoneIn');
+
+let fidgetState = {
+    locked: false,
+    maxTravel: 0
+};
+
+function initFidgetSwitch() {
+    const trackRect = fidgetTrack.getBoundingClientRect();
+    const knobRect = fidgetKnob.getBoundingClientRect();
+    fidgetState.maxTravel = (trackRect.width / 2) - (knobRect.width / 2);
+}
+
+window.addEventListener('resize', initFidgetSwitch);
+initFidgetSwitch();
+
+function updateFidgetVisuals(value) {
+    // Value is -100 to 100
+    // Map to pixels
+    const px = (value / 100) * fidgetState.maxTravel;
+    fidgetKnob.style.transform = `translateX(calc(-50% + ${px}px))`;
+
+    // Lock zones
+    if (value > 85) {
+        lockZoneIn.classList.add('active');
+        lockZoneOut.classList.remove('active');
+    } else if (value < -85) {
+        lockZoneOut.classList.add('active');
+        lockZoneIn.classList.remove('active');
+    } else {
+        lockZoneIn.classList.remove('active');
+        lockZoneOut.classList.remove('active');
+    }
+
+    if (fidgetState.locked) {
+        fidgetKnob.classList.add('locked');
+    } else {
+        fidgetKnob.classList.remove('locked');
+    }
+}
+
+// Input Event: Fires continuously while dragging
+fidgetInput.addEventListener('input', (e) => {
+    const value = parseInt(e.target.value);
+
+    // If locked and user drags back towards center, unlock
+    if (fidgetState.locked) {
+        if ((fidgetState.locked === 'in' && value < 90) ||
+            (fidgetState.locked === 'out' && value > -90)) {
+            fidgetState.locked = false;
+        }
+    }
+
+    updateFidgetVisuals(value);
+
+    // Calculate velocity
+    // Deadzone around 0
+    if (Math.abs(value) > 5) {
+        const direction = -Math.sign(value); // Right (positive val) = Zoom In (negative delta)
+        const intensity = (Math.abs(value) - 5) / 95;
+        const speed = intensity * intensity; // Quadratic curve
+
+        state.fidgetZoomVelocity = direction * speed;
+    } else {
+        state.fidgetZoomVelocity = 0;
+    }
+});
+
+// Change Event: Fires on release
+fidgetInput.addEventListener('change', (e) => {
+    const value = parseInt(e.target.value);
+
+    if (Math.abs(value) > 85) {
+        // Lock In
+        const lockVal = value > 0 ? 100 : -100;
+        fidgetInput.value = lockVal;
+        fidgetState.locked = value > 0 ? 'in' : 'out';
+
+        updateFidgetVisuals(lockVal);
+
+        // Set max velocity
+        const direction = value > 0 ? -1 : 1;
+        state.fidgetZoomVelocity = direction * 1.0;
+
+        if (navigator.vibrate) navigator.vibrate(20);
+    } else {
+        // Snap back
+        fidgetInput.value = 0;
+        fidgetState.locked = false;
+        state.fidgetZoomVelocity = 0;
+        updateFidgetVisuals(0);
+
+        // Spring animation handled by CSS transition on knob?
+        // We need to temporarily enable transition on the knob for the snap back
+        fidgetKnob.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        setTimeout(() => {
+            fidgetKnob.style.transition = 'none'; // Disable for next drag
+        }, 300);
+    }
+});
+
+// Reset transition on drag start
+fidgetInput.addEventListener('mousedown', () => {
+    fidgetKnob.style.transition = 'none';
+});
+fidgetInput.addEventListener('touchstart', () => {
+    fidgetKnob.style.transition = 'none';
+}, { passive: true });
+
+// Integrate into draw loop
+state.fidgetZoomVelocity = 0;
+
 // UI Controls - Panel Toggle with Auto-Hide
 function togglePanel(forceState) {
     state.panelVisible = forceState !== undefined ? forceState : !state.panelVisible;

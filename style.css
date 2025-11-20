@@ -1115,4 +1115,29 @@ canvas:active {
         bottom: 100px;
         /* Move FAB up to avoid overlap */
     }
+}/* Fidget Input Overlay */
+#fidgetInput {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: grab;
+    z-index: 10;
+    /* Above everything else */
+    margin: 0;
+    padding: 0;
+    -webkit-appearance: none;
+    /* Remove default styling */
+    appearance: none;
+}
+
+#fidgetInput:active {
+    cursor: grabbing;
+}
+
+/* Ensure knob doesn't block input */
+.fidget-knob {
+    pointer-events: none;
+    /* Let clicks pass through to input */
 }
