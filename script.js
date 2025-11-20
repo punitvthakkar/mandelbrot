@@ -82,6 +82,8 @@ const fsSource = `
         float iterations = 0.0;
         bool escaped = false;
 
+        float log_zn = 0.0;
+
         if (u_highPrecision) {
             vec2 uv_x_ds = vec2(uv.x, 0.0);
             vec2 uv_y_ds = vec2(uv.y, 0.0);
@@ -101,6 +103,9 @@ const fsSource = `
                 if (z_x2.x + z_y2.x > 4.0) {
                     escaped = true;
                     iterations = float(i);
+                    // Calculate log_zn for smoothing
+                    // |z|^2 = z_x2.x + z_y2.x (approx for high precision)
+                    log_zn = log(z_x2.x + z_y2.x) / 2.0;
                     break;
                 }
 
@@ -134,6 +139,7 @@ const fsSource = `
                     if (x * x + y * y > 4.0) {
                         escaped = true;
                         iterations = float(i);
+                        log_zn = log(x * x + y * y) / 2.0;
                         break;
                     }
                     z.x = x;
@@ -143,20 +149,39 @@ const fsSource = `
         }
 
         if (escaped) {
-            float t = iterations / float(u_maxIterations);
+            // Continuous iteration count smoothing
+            // nu = log2(log2(|z|)) / log2(2)
+            // log_zn is already log(|z|) = log(|z|^2)/2
+            float nu = log(log_zn / log(2.0)) / log(2.0);
+            
+            // Smooth iteration count
+            float smooth_i = iterations + 1.0 - nu;
+            
+            // Normalize t for palette lookup
+            float t = smooth_i / float(u_maxIterations);
+            
+            // Add a slight offset to t for animation/cycling if desired, 
+            // but for now just use the smooth value
+            
             vec3 color = vec3(0.0);
 
             if (u_paletteId == 0) {
-                color = palette(t, vec3(0.5), vec3(0.5), vec3(1.0), vec3(0.00, 0.10, 0.20));
+                // Ocean - adjusted for smooth t
+                color = palette(t * 10.0, vec3(0.5), vec3(0.5), vec3(1.0), vec3(0.00, 0.10, 0.20));
             } else if (u_paletteId == 1) {
-                color = palette(t, vec3(0.5), vec3(0.5), vec3(1.0, 1.0, 0.5), vec3(0.8, 0.9, 0.3));
-                color = mix(vec3(0.1, 0.0, 0.0), color, t);
+                // Magma
+                color = palette(t * 10.0, vec3(0.5), vec3(0.5), vec3(1.0, 1.0, 0.5), vec3(0.8, 0.9, 0.3));
+                color = mix(vec3(0.1, 0.0, 0.0), color, sin(t * 20.0) * 0.5 + 0.5);
             } else if (u_paletteId == 2) {
-                color = palette(t, vec3(0.5), vec3(0.5), vec3(2.0, 1.0, 0.0), vec3(0.5, 0.20, 0.25));
+                // Aurora
+                color = palette(t * 15.0, vec3(0.5), vec3(0.5), vec3(2.0, 1.0, 0.0), vec3(0.5, 0.20, 0.25));
             } else if (u_paletteId == 3) {
-                color = palette(t, vec3(0.8, 0.5, 0.4), vec3(0.2, 0.4, 0.2), vec3(2.0, 1.0, 1.0), vec3(0.00, 0.25, 0.25));
+                // Amber
+                color = palette(t * 8.0, vec3(0.8, 0.5, 0.4), vec3(0.2, 0.4, 0.2), vec3(2.0, 1.0, 1.0), vec3(0.00, 0.25, 0.25));
             } else {
-                float cycle = mod(iterations, 512.0) / 512.0;
+                // Texture palette (Extreme)
+                // Use smooth_i for cycle
+                float cycle = mod(smooth_i, 512.0) / 512.0;
                 color = texture2D(u_paletteTexture, vec2(cycle, 0.5)).rgb;
             }
             
@@ -401,6 +426,11 @@ function drawScene(timestamp) {
         }
     }
 
+    // Handle Fidget Zoom
+    if (state.fidgetZoomVelocity && state.fidgetZoomVelocity !== 0) {
+        handleZoom(state.fidgetZoomVelocity);
+    }
+
     const lerpFactor = 1.0 - Math.pow(0.1, deltaTime * 10);
 
     state.zoomSize += (state.targetZoomSize - state.zoomSize) * lerpFactor;
@@ -492,7 +522,9 @@ function handleZoom(delta, x, y) {
     }
 
     // Progressive slowdown as we zoom in (exponential)
-    const zoomFactor = 1.0 + baseFactor * Math.pow(state.targetZoomSize, 0.3);
+    // Scale baseFactor by delta magnitude for analog control
+    const speedMultiplier = Math.abs(delta);
+    const zoomFactor = 1.0 + (baseFactor * speedMultiplier) * Math.pow(state.targetZoomSize, 0.3);
 
     if (x === undefined || y === undefined) {
         x = canvas.width / 2;
@@ -794,11 +826,6 @@ document.addEventListener('keydown', (e) => {
             togglePanel();
             break;
         case 'r':
-            document.getElementById('resetBtn').click();
-            break;
-        case 'f':
-            toggleFullscreen();
-            break;
         case 't':
             document.getElementById('autoTourBtn').click();
             break;

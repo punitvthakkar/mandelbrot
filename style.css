@@ -982,4 +982,137 @@ canvas:active {
 /* Dark mode optimization (already dark by default) */
 @media (prefers-color-scheme: light) {
     /* Keep dark theme for better fractal visibility */
+}/* Fidget Zoom Switch */
+.fidget-zoom-container {
+    position: fixed;
+    bottom: var(--spacing-xl);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    z-index: 100;
+    width: 280px;
+}
+
+.fidget-track {
+    width: 100%;
+    height: 64px;
+    background: rgba(20, 20, 25, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-panel);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-lg), inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.fidget-lock-zone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-tertiary);
+    transition: all var(--transition-normal);
+    z-index: 0;
+}
+
+.fidget-lock-zone.left {
+    left: 0;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+}
+
+.fidget-lock-zone.right {
+    right: 0;
+    background: linear-gradient(-90deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+}
+
+.fidget-lock-zone svg {
+    width: 24px;
+    height: 24px;
+    opacity: 0.5;
+    transition: all var(--transition-fast);
+}
+
+.fidget-lock-zone.active {
+    color: var(--accent-primary);
+}
+
+.fidget-lock-zone.active svg {
+    opacity: 1;
+    transform: scale(1.2);
+}
+
+.fidget-knob {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+    border-radius: 50%;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.2),
+        0 8px 16px rgba(0, 0, 0, 0.2),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.1);
+    cursor: grab;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    /* Prevent scroll while dragging */
+}
+
+.fidget-knob:active {
+    cursor: grabbing;
+    transform: translateX(-50%) scale(0.95);
+}
+
+.fidget-knob.locked {
+    background: var(--accent-primary);
+    box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.knob-grip {
+    width: 6px;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    box-shadow: 10px 0 0 rgba(0, 0, 0, 0.2), -10px 0 0 rgba(0, 0, 0, 0.2);
+}
+
+.fidget-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    opacity: 0.8;
+}
+
+/* Hide old zoom buttons */
+.zoom-btn-group {
+    display: none;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+    .fidget-zoom-container {
+        bottom: var(--spacing-lg);
+        width: 260px;
+    }
+
+    .control-toggle-fab {
+        bottom: 100px;
+        /* Move FAB up to avoid overlap */
+    }
 }
