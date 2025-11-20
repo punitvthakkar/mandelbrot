@@ -136,17 +136,17 @@ canvas:active {
     width: var(--fab-size-desktop);
     height: var(--fab-size-desktop);
     border-radius: var(--radius-full);
-    border: none;
-    background: var(--gradient-primary);
-    color: white;
+    border: 1px solid var(--border-panel);
+    background: var(--bg-overlay);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: var(--text-primary);
     cursor: pointer;
     z-index: 150;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.25rem;
-    box-shadow: var(--shadow-lg), var(--shadow-glow);
+    box-shadow: var(--shadow-lg);
     transition: all var(--transition-normal);
     overflow: hidden;
 }
@@ -155,14 +155,15 @@ canvas:active {
     content: '';
     position: absolute;
     inset: 0;
-    background: var(--gradient-glass);
+    background: rgba(255, 255, 255, 0.1);
     opacity: 0;
     transition: opacity var(--transition-fast);
 }
 
 .control-toggle-fab:hover {
     transform: scale(1.1) translateY(-2px);
-    box-shadow: 0 12px 40px rgba(99, 102, 241, 0.4);
+    background: rgba(0, 0, 0, 0.7);
+    box-shadow: var(--shadow-md);
 }
 
 .control-toggle-fab:hover::before {
@@ -174,8 +175,8 @@ canvas:active {
 }
 
 .control-toggle-fab .toggle-icon {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     position: relative;
     z-index: 1;
     animation: rotate 20s linear infinite;
@@ -189,15 +190,6 @@ canvas:active {
     to {
         transform: rotate(360deg);
     }
-}
-
-.control-toggle-fab .fab-label {
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    position: relative;
-    z-index: 1;
 }
 
 .control-toggle-fab.hidden {

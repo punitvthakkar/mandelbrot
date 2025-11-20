@@ -681,17 +681,6 @@ function togglePanel(forceState) {
     }
 }
 
-// Tap canvas to show controls if hidden
-canvas.addEventListener('click', () => {
-    if (!state.panelVisible && !state.isDragging) {
-        const screenCtx = getScreenContext();
-        if (screenCtx.isMobile) {
-            // Only on mobile, single tap shows controls
-            togglePanel(true);
-        }
-    }
-});
-
 document.getElementById('controlToggle').addEventListener('click', () => {
     togglePanel();
 });
