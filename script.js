@@ -827,6 +827,7 @@ function initCircleControl() {
         state.circleDrag.startX = x;
         state.circleDrag.startY = y;
         state.circleDrag.startIter = state.maxIterations;
+        state.circleDrag.maxDist = 0; // Track max movement for tap detection
         circle.classList.add('dragging');
     };
 
@@ -836,11 +837,16 @@ function initCircleControl() {
         const dx = x - state.circleDrag.startX;
         const dy = y - state.circleDrag.startY;
 
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        state.circleDrag.maxDist = Math.max(state.circleDrag.maxDist, dist);
+
         // Vertical Drag -> Zoom
-        // Pull UP (negative dy) -> Zoom IN
-        // Pull DOWN (positive dy) -> Zoom OUT
+        // Pull UP (negative dy) -> Zoom IN (requires negative delta)
+        // Pull DOWN (positive dy) -> Zoom OUT (requires positive delta)
+        // Previously: -dy * 0.05. If dy = -10 (UP), delta = 0.5 (Positive) -> Zoom OUT. WRONG.
+        // Fix: dy * 0.05. If dy = -10 (UP), delta = -0.5 (Negative) -> Zoom IN. CORRECT.
         if (Math.abs(dy) > 10) {
-            const zoomDelta = -dy * 0.05; // Sensitivity
+            const zoomDelta = dy * 0.05; // Sensitivity
             handleZoom(zoomDelta);
         }
 
@@ -873,8 +879,7 @@ function initCircleControl() {
         if (!state.circleDrag.active) return;
 
         // Check for Tap (minimal movement)
-        const wasTap = !circle.querySelector('.circle-inner').style.transform ||
-            circle.querySelector('.circle-inner').style.transform === 'translate(0px, 0px)';
+        const wasTap = state.circleDrag.maxDist < 10;
 
         state.circleDrag.active = false;
         circle.classList.remove('dragging');
