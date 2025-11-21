@@ -1225,11 +1225,45 @@ window.addEventListener('resize', () => {
 // updateLocationInfo('default'); removed
 
 // --- PWA Install Logic ---
-// --- PWA Install Logic ---
 let deferredPrompt;
 const pwaPrompt = document.getElementById('pwaInstallPrompt');
 const installBtn = document.getElementById('pwaInstallBtn');
 const closePwaBtn = document.getElementById('pwaCloseBtn');
+
+// Check if app is already installed (standalone mode)
+function isAppInstalled() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           window.navigator.standalone === true ||
+           document.referrer.includes('android-app://');
+}
+
+// Check if prompt was dismissed
+function wasPromptDismissed() {
+    return localStorage.getItem('pwa_prompt_dismissed') === 'true';
+}
+
+// Mark prompt as dismissed
+function dismissPrompt() {
+    localStorage.setItem('pwa_prompt_dismissed', 'true');
+    pwaPrompt.classList.add('hidden');
+}
+
+// Check if we should show the prompt
+function shouldShowPrompt() {
+    // Don't show if already installed
+    if (isAppInstalled()) {
+        return false;
+    }
+    // Don't show if previously dismissed
+    if (wasPromptDismissed()) {
+        return false;
+    }
+    // Only show on mobile/tablet widths
+    if (window.innerWidth >= 768) {
+        return false;
+    }
+    return true;
+}
 
 window.addEventListener('beforeinstallprompt', (e) => {
     // Prevent the mini-infobar from appearing on mobile
@@ -1238,9 +1272,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
     deferredPrompt = e;
     console.log('beforeinstallprompt fired');
 
-    // Show prompt only on mobile/tablet widths
-    if (window.innerWidth < 768) {
-        // Show the custom install prompt
+    // Only show if conditions are met
+    if (shouldShowPrompt()) {
         pwaPrompt.classList.remove('hidden');
     }
 });
@@ -1259,18 +1292,29 @@ installBtn.addEventListener('click', async () => {
     deferredPrompt = null;
     // Hide our custom UI
     pwaPrompt.classList.add('hidden');
+    // Mark as dismissed if user declined
+    if (outcome === 'dismissed') {
+        dismissPrompt();
+    }
 });
 
 closePwaBtn.addEventListener('click', () => {
-    pwaPrompt.classList.add('hidden');
+    dismissPrompt();
 });
 
 window.addEventListener('appinstalled', () => {
     // Hide the app-provided install promotion
     pwaPrompt.classList.add('hidden');
     deferredPrompt = null;
+    // Mark as dismissed since app is now installed
+    dismissPrompt();
     console.log('PWA was installed');
 });
+
+// Check on load if we should hide the prompt
+if (isAppInstalled() || wasPromptDismissed()) {
+    pwaPrompt.classList.add('hidden');
+}
 
 // --- HUD & Save Location Logic ---
 const statsDisplay = document.getElementById('stats');

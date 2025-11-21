@@ -1200,6 +1200,14 @@ canvas:active {
     .hud-stats {
         font-size: 11px;
     }
+
+    /* Position PWA prompt above zoom slider on mobile */
+    .pwa-prompt {
+        bottom: 140px;
+        /* Above zoom slider (24px + 72px + gap) and FAB */
+        width: calc(100% - 32px);
+        max-width: 360px;
+    }
 }
 
 /* Fidget Input Overlay */
@@ -1520,7 +1528,8 @@ input[type=range]::-webkit-slider-thumb:hover {
 /* --- PWA Install Prompt --- */
 .pwa-prompt {
     position: fixed;
-    bottom: 20px;
+    bottom: 120px;
+    /* Position above zoom slider (which is at ~80px from bottom) */
     left: 50%;
     transform: translateX(-50%);
     width: 90%;
@@ -1529,20 +1538,20 @@ input[type=range]::-webkit-slider-thumb:hover {
     border: 1px solid rgba(0, 255, 255, 0.3);
     border-radius: 12px;
     padding: 16px;
-    z-index: 3000;
+    z-index: 100;
+    /* Lower z-index so it doesn't block other interactions */
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(10px);
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+    opacity: 1;
+    pointer-events: auto;
 }
 
-transform: translateX(-50%) translateY(100px);
-opacity: 0;
-pointer-events: none;
-display: none;
-}
-
-.pwa-prompt:not(.hidden) {
-    display: block;
+.pwa-prompt.hidden {
+    transform: translateX(-50%) translateY(100px);
+    opacity: 0;
+    pointer-events: none;
+    display: none;
 }
 
 .pwa-content {
