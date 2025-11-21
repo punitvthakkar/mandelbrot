@@ -179,7 +179,7 @@ canvas:active {
     height: 28px;
     position: relative;
     z-index: 1;
-    animation: rotate 20s linear infinite;
+    /* animation: rotate 20s linear infinite; Removed per user request */
 }
 
 @keyframes rotate {
@@ -1001,17 +1001,26 @@ canvas:active {
 .fidget-track {
     width: 100%;
     height: 64px;
-    background: rgba(20, 20, 25, 0.6);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: rgba(20, 20, 25, 0.3);
+    /* More transparent default */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border-radius: var(--radius-full);
-    border: 1px solid var(--border-panel);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: var(--shadow-lg), inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
     overflow: hidden;
+    transition: opacity 0.3s ease, background 0.3s ease;
+}
+
+/* Fade out when interacting */
+.fidget-zoom-container:active,
+.fidget-zoom-container:focus-within {
+    opacity: 0.4;
+    background: rgba(20, 20, 25, 0.1);
 }
 
 .fidget-lock-zone {
@@ -1116,6 +1125,21 @@ canvas:active {
     .control-toggle-fab {
         bottom: 100px;
         /* Move FAB up to avoid overlap */
+    }
+
+    /* Move HUD to top-left on mobile to avoid slider overlap */
+    .status-display {
+        bottom: auto;
+        top: 20px;
+        left: 20px;
+        right: auto;
+        padding: 6px 10px;
+        /* Smaller padding */
+    }
+
+    .hud-stats {
+        font-size: 10px;
+        /* Smaller font */
     }
 }
 
