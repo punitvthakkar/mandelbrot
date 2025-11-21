@@ -1,62 +1,95 @@
 :root {
-    /* Color System */
-    --bg-primary: #0a0a0a;
-    --bg-panel: rgba(15, 15, 20, 0.85);
-    --bg-overlay: rgba(0, 0, 0, 0.6);
-    --border-panel: rgba(255, 255, 255, 0.08);
-    --border-focus: rgba(79, 70, 229, 0.5);
+    /* M3 Color System (Dark Theme) */
+    --md-sys-color-surface: #141218;
+    --md-sys-color-surface-container: #1D1B20;
+    --md-sys-color-surface-container-high: #2B2930;
+    --md-sys-color-on-surface: #E6E1E5;
+    --md-sys-color-on-surface-variant: #CAC4D0;
 
-    /* Text Colors */
-    --text-primary: #ffffff;
-    --text-secondary: #b4b4b4;
-    --text-tertiary: #707070;
-    --text-muted: #4a4a4a;
+    --md-sys-color-primary: #D0BCFF;
+    --md-sys-color-on-primary: #381E72;
+    --md-sys-color-primary-container: #4F378B;
+    --md-sys-color-on-primary-container: #EADDFF;
 
-    /* Accent Colors */
-    --accent-primary: #6366f1;
-    --accent-hover: #818cf8;
-    --accent-active: #4f46e5;
-    --accent-glow: rgba(99, 102, 241, 0.5);
+    --md-sys-color-secondary: #CCC2DC;
+    --md-sys-color-on-secondary: #332D41;
+    --md-sys-color-secondary-container: #4A4458;
+    --md-sys-color-on-secondary-container: #E8DEF8;
+
+    --md-sys-color-tertiary: #EFB8C8;
+    --md-sys-color-on-tertiary: #492532;
+    --md-sys-color-tertiary-container: #633B48;
+    --md-sys-color-on-tertiary-container: #FFD8E4;
+
+    /* Legacy Mappings (for compatibility during refactor) */
+    --bg-primary: var(--md-sys-color-surface);
+    --bg-panel: var(--md-sys-color-surface-container);
+    --bg-overlay: rgba(20, 18, 24, 0.7);
+    /* Surface with opacity */
+    --border-panel: var(--md-sys-color-surface-container-high);
+
+    --text-primary: var(--md-sys-color-on-surface);
+    --text-secondary: var(--md-sys-color-on-surface-variant);
+    --text-tertiary: rgba(230, 225, 229, 0.6);
+
+    --accent-primary: var(--md-sys-color-primary);
+    --accent-hover: #E8DEF8;
+    /* Light purple */
+    --accent-active: var(--md-sys-color-on-primary-container);
+    --accent-glow: rgba(208, 188, 255, 0.3);
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --gradient-accent: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    --gradient-primary: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-tertiary) 100%);
 
     /* Typography */
-    --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-family: 'Outfit', sans-serif;
 
     /* Spacing */
-    --spacing-xs: 0.5rem;
-    --spacing-sm: 0.75rem;
-    --spacing-md: 1rem;
-    --spacing-lg: 1.5rem;
-    --spacing-xl: 2rem;
-    --spacing-2xl: 3rem;
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-2xl: 48px;
 
-    /* Border Radius */
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
-    --radius-full: 9999px;
+    /* Shapes (Expressive) */
+    --shape-corner-none: 0px;
+    --shape-corner-extra-small: 4px;
+    --shape-corner-small: 8px;
+    --shape-corner-medium: 12px;
+    --shape-corner-large: 16px;
+    --shape-corner-extra-large: 28px;
+    --shape-corner-full: 9999px;
 
-    /* Transitions */
-    --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Legacy Radius Mappings */
+    --radius-sm: var(--shape-corner-small);
+    --radius-md: var(--shape-corner-medium);
+    --radius-lg: var(--shape-corner-large);
+    --radius-xl: var(--shape-corner-extra-large);
+    --radius-full: var(--shape-corner-full);
+
+    /* Transitions (Expressive Motion) */
+    --motion-easing-standard: cubic-bezier(0.2, 0.0, 0, 1.0);
+    --motion-easing-emphasized: cubic-bezier(0.2, 0.0, 0, 1.0);
+    /* Spring-like */
+    --transition-fast: 200ms var(--motion-easing-standard);
+    --transition-normal: 400ms var(--motion-easing-emphasized);
+    --transition-slow: 600ms var(--motion-easing-emphasized);
 
     /* Shadows */
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.2);
-    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+    --elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+    --elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+
+    --shadow-sm: var(--elevation-1);
+    --shadow-md: var(--elevation-2);
+    --shadow-lg: var(--elevation-3);
     --shadow-glow: 0 0 20px var(--accent-glow);
 
     /* Layout */
-    --panel-width-desktop: 420px;
-    --panel-height-mobile: 65vh;
-    --fab-size-desktop: 60px;
-    --fab-size-mobile: 56px;
+    --panel-width-desktop: 400px;
+    --fab-size: 56px;
+    --fab-size-large: 96px;
 }
 
 /* Reset & Base */
@@ -128,25 +161,24 @@ canvas:active {
     opacity: 0.6;
 }
 
-/* Floating Control Toggle Button (FAB) */
+/* M3 Large FAB */
 .control-toggle-fab {
     position: fixed;
-    bottom: var(--spacing-xl);
-    right: var(--spacing-xl);
-    width: var(--fab-size-desktop);
-    height: var(--fab-size-desktop);
-    border-radius: var(--radius-full);
-    border: 1px solid var(--border-panel);
-    background: var(--bg-overlay);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    color: var(--text-primary);
+    bottom: var(--spacing-lg);
+    right: var(--spacing-lg);
+    width: var(--fab-size-large);
+    height: var(--fab-size-large);
+    border-radius: var(--shape-corner-extra-large);
+    /* Squircle-ish */
+    border: none;
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
     cursor: pointer;
     z-index: 150;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--elevation-3);
     transition: all var(--transition-normal);
     overflow: hidden;
 }
@@ -198,21 +230,23 @@ canvas:active {
     transform: scale(0.8);
 }
 
-/* Control Panel - Desktop: Slide from Right */
+/* Control Panel - M3 Floating Drawer (Desktop) */
 .control-panel {
     position: fixed;
-    top: 0;
-    right: 0;
+    top: var(--spacing-lg);
+    right: var(--spacing-lg);
+    bottom: var(--spacing-lg);
     width: var(--panel-width-desktop);
-    height: 100vh;
-    background: var(--bg-panel);
-    backdrop-filter: blur(40px) saturate(180%);
-    -webkit-backdrop-filter: blur(40px) saturate(180%);
-    border-left: 1px solid var(--border-panel);
-    box-shadow: -4px 0 40px rgba(0, 0, 0, 0.5);
+    height: auto;
+    /* Fit within margins */
+    background: var(--md-sys-color-surface-container);
+    border-radius: var(--shape-corner-extra-large);
+    border: none;
+    box-shadow: var(--elevation-3);
     z-index: 200;
-    transform: translateX(100%);
-    transition: transform var(--transition-slow);
+    transform: translateX(calc(100% + var(--spacing-xl)));
+    /* Hide off-screen */
+    transition: transform var(--transition-normal);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -220,6 +254,26 @@ canvas:active {
 
 .control-panel.visible {
     transform: translateX(0);
+}
+
+/* Mobile Bottom Sheet Style */
+@media (max-width: 768px) {
+    .control-panel {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: 85vh;
+        /* Bottom sheet height */
+        border-radius: var(--shape-corner-extra-large) var(--shape-corner-extra-large) 0 0;
+        transform: translateY(100%);
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .control-panel.visible {
+        transform: translateY(0);
+    }
 }
 
 /* Panel Header */
@@ -617,25 +671,24 @@ canvas:active {
     transform: translateY(0);
 }
 
-/* Status Display - Bottom Left */
+/* Status Display - M3 Floating Pill */
 .status-display {
     position: fixed;
-    bottom: var(--spacing-xl);
-    left: var(--spacing-xl);
-    background: var(--bg-overlay);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: var(--spacing-sm) var(--spacing-lg);
-    border-radius: var(--radius-full);
-    font-family: 'SF Mono', Monaco, monospace;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
+    bottom: var(--spacing-lg);
+    left: var(--spacing-lg);
+    background: var(--md-sys-color-surface-container);
+    color: var(--md-sys-color-on-surface);
+    padding: 12px 24px;
+    border-radius: var(--shape-corner-full);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
-    border: 1px solid var(--border-panel);
-    box-shadow: var(--shadow-lg);
+    border: none;
+    box-shadow: var(--elevation-2);
     z-index: 50;
+    transition: all var(--transition-normal);
 }
 
 .status-item {
@@ -984,77 +1037,80 @@ canvas:active {
     /* Keep dark theme for better fractal visibility */
 }
 
-/* Fidget Zoom Switch */
+/* M3 Expressive Slider */
 .fidget-zoom-container {
     position: fixed;
-    bottom: var(--spacing-xl);
+    bottom: var(--spacing-lg);
     left: 50%;
     transform: translateX(-50%);
+    width: 320px;
+    z-index: 100;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--spacing-sm);
-    z-index: 100;
-    width: 280px;
+    transition: opacity var(--transition-normal);
 }
 
 .fidget-track {
     width: 100%;
-    height: 64px;
-    background: rgba(20, 20, 25, 0.3);
-    /* More transparent default */
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-radius: var(--radius-full);
+    height: 72px;
+    /* Taller for touch */
+    background: rgba(29, 27, 32, 0.4);
+    /* Surface container low opacity */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: var(--shape-corner-full);
+    /* Pill shape */
     border: 1px solid rgba(255, 255, 255, 0.1);
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--elevation-1);
     overflow: hidden;
-    transition: opacity 0.3s ease, background 0.3s ease;
+    transition: all var(--transition-normal);
 }
 
 /* Fade out when interacting */
 .fidget-zoom-container:active,
 .fidget-zoom-container:focus-within {
-    opacity: 0.4;
-    background: rgba(20, 20, 25, 0.1);
+    opacity: 0.3;
+    /* Significant fade out */
+    transform: translateX(-50%) scale(0.98);
 }
 
 .fidget-lock-zone {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 64px;
+    width: 72px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-tertiary);
-    transition: all var(--transition-normal);
+    color: var(--md-sys-color-on-surface-variant);
+    transition: all var(--transition-fast);
     z-index: 0;
 }
 
 .fidget-lock-zone.left {
     left: 0;
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+    background: linear-gradient(90deg, var(--md-sys-color-surface-container) 0%, transparent 100%);
 }
 
 .fidget-lock-zone.right {
     right: 0;
-    background: linear-gradient(-90deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+    background: linear-gradient(-90deg, var(--md-sys-color-surface-container) 0%, transparent 100%);
 }
 
 .fidget-lock-zone svg {
     width: 24px;
     height: 24px;
     opacity: 0.5;
-    transition: all var(--transition-fast);
 }
 
 .fidget-lock-zone.active {
-    color: var(--accent-primary);
+    color: var(--md-sys-color-primary);
 }
 
 .fidget-lock-zone.active svg {
@@ -1065,49 +1121,47 @@ canvas:active {
 .fidget-knob {
     width: 56px;
     height: 56px;
-    background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+    background: var(--md-sys-color-primary-container);
     border-radius: 50%;
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    box-shadow:
-        0 4px 8px rgba(0, 0, 0, 0.2),
-        0 8px 16px rgba(0, 0, 0, 0.2),
-        inset 0 -2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--elevation-2);
     cursor: grab;
     z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
     touch-action: none;
-    /* Prevent scroll while dragging */
+    transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .fidget-knob:active {
     cursor: grabbing;
-    transform: translateX(-50%) scale(0.95);
+    transform: translateX(-50%) scale(0.9);
+    background: var(--md-sys-color-primary);
 }
 
 .fidget-knob.locked {
-    background: var(--accent-primary);
-    box-shadow: 0 0 20px var(--accent-glow);
+    background: var(--md-sys-color-tertiary-container);
+    box-shadow: 0 0 0 4px var(--md-sys-color-tertiary);
 }
 
 .knob-grip {
-    width: 6px;
-    height: 6px;
-    background: rgba(0, 0, 0, 0.2);
+    width: 4px;
+    height: 4px;
+    background: var(--md-sys-color-on-primary-container);
     border-radius: 50%;
-    box-shadow: 10px 0 0 rgba(0, 0, 0, 0.2), -10px 0 0 rgba(0, 0, 0, 0.2);
+    box-shadow: 8px 0 0 var(--md-sys-color-on-primary-container), -8px 0 0 var(--md-sys-color-on-primary-container);
 }
 
 .fidget-label {
     font-size: 0.75rem;
-    color: var(--text-secondary);
+    color: var(--md-sys-color-on-surface-variant);
     font-weight: 500;
-    letter-spacing: 0.05em;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.02em;
     opacity: 0.8;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 /* Hide old zoom buttons */
@@ -1124,22 +1178,26 @@ canvas:active {
 
     .control-toggle-fab {
         bottom: 100px;
-        /* Move FAB up to avoid overlap */
+        width: 64px;
+        /* Smaller on mobile but still substantial */
+        height: 64px;
+        border-radius: 20px;
     }
 
-    /* Move HUD to top-left on mobile to avoid slider overlap */
+    /* Move HUD to top-left on mobile */
     .status-display {
         bottom: auto;
-        top: 20px;
-        left: 20px;
+        top: var(--spacing-md);
+        left: var(--spacing-md);
         right: auto;
-        padding: 6px 10px;
-        /* Smaller padding */
+        padding: 8px 16px;
+        background: rgba(29, 27, 32, 0.8);
+        /* Surface container with opacity */
+        backdrop-filter: blur(10px);
     }
 
     .hud-stats {
-        font-size: 10px;
-        /* Smaller font */
+        font-size: 11px;
     }
 }
 
