@@ -1600,3 +1600,160 @@ input[type=range]::-webkit-slider-thumb:hover {
     font-size: 16px;
     line-height: 1;
 }
+
+/* Explore Tabs */
+.explore-tabs {
+    display: flex;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: var(--radius-md);
+    padding: 4px;
+    margin-bottom: var(--spacing-md);
+    gap: 4px;
+}
+
+.explore-tab {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.explore-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.explore-tab.active {
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--accent-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.duration-control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.duration-control-row .styled-input {
+    width: 60px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-panel);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    text-align: center;
+}
+
+/* Fractal Grid */
+.fractal-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+}
+
+.fractal-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    text-align: left;
+    width: 100%;
+}
+
+.fractal-card:hover {
+    background: rgba(0, 0, 0, 0.5);
+    transform: translateX(4px);
+}
+
+.fractal-card.active {
+    border-color: var(--accent-primary);
+    background: rgba(99, 102, 241, 0.15);
+}
+
+.fractal-preview {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-sm);
+    background-size: cover;
+    background-position: center;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
+}
+
+/* CSS Gradients for Previews (Placeholder until real thumbs) */
+.mandelbrot-preview {
+    background: radial-gradient(circle at 30% 50%, #000 0%, #001133 40%, #006699 100%);
+}
+
+.julia-preview {
+    background: radial-gradient(circle, #220011 0%, #cc4400 50%, #ffeeaa 100%);
+}
+
+.sierpinski-preview {
+    background: conic-gradient(from 0deg at 50% 50%, #000 0%, #fff 33%, #000 33%, #fff 66%, #000 66%, #fff 100%);
+}
+
+.dragon-preview {
+    background: linear-gradient(45deg, #000 25%, #ff0055 25%, #ff0055 50%, #000 50%, #000 75%, #ff0055 75%, #ff0055 100%);
+    background-size: 10px 10px;
+}
+
+.newton-preview {
+    background: radial-gradient(circle at 30% 30%, #ff0000 0%, transparent 50%),
+        radial-gradient(circle at 70% 30%, #00ff00 0%, transparent 50%),
+        radial-gradient(circle at 50% 70%, #0000ff 0%, transparent 50%),
+        #000;
+}
+
+.fractal-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.fractal-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.fractal-desc {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+}

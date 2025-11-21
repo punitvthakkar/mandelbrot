@@ -104,17 +104,65 @@
                 </div>
             </div>
 
-            <!-- Visual Catalogue -->
+            <!-- Explore Section -->
             <div class="control-section">
-                <label class="section-label">
-                    <span>Explore Locations</span>
-                    <div class="duration-control">
-                        <label for="journeyDuration">Duration (s):</label>
+                <label class="section-label">Explore</label>
+
+                <div class="explore-tabs">
+                    <button class="explore-tab active" data-tab="scenes">Scenes</button>
+                    <button class="explore-tab" data-tab="fractals">Fractals</button>
+                </div>
+
+                <!-- Tab: Scenes -->
+                <div id="tabScenes" class="tab-content active">
+                    <div class="duration-control-row">
+                        <label for="journeyDuration">Fly Duration (s):</label>
                         <input type="number" id="journeyDuration" class="styled-input" value="30" min="1" max="60">
                     </div>
-                </label>
-                <div id="visualCatalogue" class="catalogue-grid">
-                    <!-- Populated by JS -->
+                    <div id="visualCatalogue" class="catalogue-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Tab: Fractals -->
+                <div id="tabFractals" class="tab-content">
+                    <div class="fractal-grid">
+                        <button class="fractal-card active" data-type="0">
+                            <div class="fractal-preview mandelbrot-preview"></div>
+                            <div class="fractal-info">
+                                <span class="fractal-name">Mandelbrot</span>
+                                <span class="fractal-desc">The classic set</span>
+                            </div>
+                        </button>
+                        <button class="fractal-card" data-type="1">
+                            <div class="fractal-preview julia-preview"></div>
+                            <div class="fractal-info">
+                                <span class="fractal-name">Julia</span>
+                                <span class="fractal-desc">Self-similar spirals</span>
+                            </div>
+                        </button>
+                        <button class="fractal-card" data-type="2">
+                            <div class="fractal-preview sierpinski-preview"></div>
+                            <div class="fractal-info">
+                                <span class="fractal-name">Sierpinski</span>
+                                <span class="fractal-desc">Infinite triangles</span>
+                            </div>
+                        </button>
+                        <button class="fractal-card" data-type="3">
+                            <div class="fractal-preview dragon-preview"></div>
+                            <div class="fractal-info">
+                                <span class="fractal-name">Dragon</span>
+                                <span class="fractal-desc">Heighway curve</span>
+                            </div>
+                        </button>
+                        <button class="fractal-card" data-type="4">
+                            <div class="fractal-preview newton-preview"></div>
+                            <div class="fractal-info">
+                                <span class="fractal-name">Newton</span>
+                                <span class="fractal-desc">Basins of attraction</span>
+                            </div>
+                        </button>
+                    </div>
                 </div>
             </div>
 
