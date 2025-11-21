@@ -162,86 +162,167 @@ canvas:active {
     opacity: 0.6;
 }
 
-/* M3 Large FAB */
-.control-toggle-fab {
+/* Top Right Status Container */
+.status-container {
     position: fixed;
-    bottom: var(--spacing-lg);
+    top: var(--spacing-lg);
     right: var(--spacing-lg);
-    width: var(--fab-size-large);
-    height: var(--fab-size-large);
-    border-radius: var(--shape-corner-extra-large);
-    /* Squircle-ish */
-    border: none;
-    background: var(--md-sys-color-primary-container);
-    color: var(--md-sys-color-on-primary-container);
-    cursor: pointer;
-    z-index: 150;
+    background: rgba(20, 18, 24, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: var(--spacing-md);
+    border-radius: var(--shape-corner-medium);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--elevation-3);
+    flex-direction: column;
+    gap: 4px;
+    z-index: 100;
+    cursor: pointer;
     transition: all var(--transition-normal);
-    overflow: hidden;
+    min-width: 140px;
 }
 
-.control-toggle-fab::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: rgba(255, 255, 255, 0.1);
+.status-container:hover {
+    background: rgba(20, 18, 24, 0.8);
+    border-color: var(--accent-primary);
+    transform: translateY(2px);
+    box-shadow: var(--shadow-md);
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.status-label {
+    color: var(--accent-primary);
+    font-weight: 700;
+    margin-right: var(--spacing-sm);
+}
+
+.status-value {
+    color: var(--text-primary);
+}
+
+.status-hint {
+    font-size: 0.6rem;
+    text-align: center;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+    letter-spacing: 0.1em;
+    font-weight: 600;
     opacity: 0;
     transition: opacity var(--transition-fast);
 }
 
-.control-toggle-fab:hover {
-    transform: scale(1.1) translateY(-2px);
-    background: rgba(0, 0, 0, 0.7);
-    box-shadow: var(--shadow-md);
-}
-
-.control-toggle-fab:hover::before {
+.status-container:hover .status-hint {
     opacity: 1;
 }
 
-.control-toggle-fab:active {
-    transform: scale(0.95);
-}
-
-.control-toggle-fab .toggle-icon {
-    width: 28px;
-    height: 28px;
-    position: relative;
-    z-index: 1;
-    /* animation: rotate 20s linear infinite; Removed per user request */
-}
-
-@keyframes rotate {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.control-toggle-fab.hidden {
-    opacity: 0;
+/* Circle Control - Bottom Center */
+.circle-control-container {
+    position: fixed;
+    bottom: var(--spacing-xl);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 150;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     pointer-events: none;
-    transform: scale(0.8);
+    /* Let clicks pass through container, but catch on circle */
 }
+
+.circle-control {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: grab;
+    pointer-events: auto;
+    transition: width 0.2s, height 0.2s, background 0.3s;
+    position: relative;
+}
+
+.circle-control:active {
+    cursor: grabbing;
+    width: 72px;
+    height: 72px;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.circle-inner {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    box-shadow: 0 0 20px var(--accent-glow);
+    transition: transform 0.1s;
+}
+
+.circle-control:active .circle-inner {
+    transform: scale(0.9);
+}
+
+/* Control Guides (Visual Feedback) */
+.control-guide {
+    position: absolute;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.6);
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.circle-control.dragging .control-guide {
+    opacity: 0.8;
+}
+
+.guide-up {
+    top: -30px;
+}
+
+.guide-down {
+    bottom: -30px;
+}
+
+.guide-left {
+    left: -90px;
+}
+
+.guide-right {
+    right: -90px;
+}
+
 
 /* Control Panel - M3 Floating Drawer (Desktop) */
 .control-panel {
     position: fixed;
-    top: var(--spacing-lg);
-    right: var(--spacing-lg);
-    bottom: var(--spacing-lg);
+    top: 0;
+    right: 0;
+    bottom: 0;
     width: var(--panel-width-desktop);
-    height: auto;
+    height: 100vh;
     /* Fit within margins */
-    background: var(--md-sys-color-surface-container);
-    border-radius: var(--shape-corner-extra-large);
+    background: rgba(20, 18, 24, 0.95);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border-left: 1px solid var(--border-panel);
+    border-radius: 0;
     border: none;
     box-shadow: var(--elevation-3);
     z-index: 200;
@@ -586,6 +667,26 @@ canvas:active {
             #6e005f 80%, #6a00a8 85%, #4d108c 90%, #2d1450 95%, #000000 100%);
 }
 
+.palette-5 {
+    background: linear-gradient(90deg, #4d3333 0%, #808080 50%, #00ffff 100%);
+}
+
+.palette-6 {
+    background: linear-gradient(90deg, #cc8866 0%, #336633 50%, #004040 100%);
+}
+
+.palette-7 {
+    background: linear-gradient(90deg, #808080 0%, #ffff00 50%, #803340 100%);
+}
+
+.palette-8 {
+    background: linear-gradient(90deg, #808080 0%, #ffffff 50%, #0054aa 100%);
+}
+
+.palette-9 {
+    background: linear-gradient(90deg, #33b366 0%, #80334d 50%, #001a00 100%);
+}
+
 .palette-name {
     font-size: 0.7rem;
     color: var(--text-secondary);
@@ -636,83 +737,9 @@ canvas:active {
     transform: scale(1.2);
 }
 
-/* Zoom Button Group */
-.zoom-btn-group {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-sm);
-}
 
-.zoom-btn {
-    padding: var(--spacing-md);
-    border-radius: var(--radius-md);
-    border: none;
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-primary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all var(--transition-normal);
-    min-height: 48px;
-}
 
-.zoom-btn svg {
-    width: 28px;
-    height: 28px;
-}
 
-.zoom-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-sm);
-}
-
-.zoom-btn:active {
-    transform: translateY(0);
-}
-
-/* Status Display - M3 Floating Pill */
-.status-display {
-    position: fixed;
-    bottom: var(--spacing-lg);
-    left: var(--spacing-lg);
-    background: var(--md-sys-color-surface-container);
-    color: var(--md-sys-color-on-surface);
-    padding: 12px 24px;
-    border-radius: var(--shape-corner-full);
-    font-family: 'Space Mono', monospace;
-    font-size: 0.85rem;
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-    border: none;
-    box-shadow: var(--elevation-2);
-    z-index: 50;
-    transition: all var(--transition-normal);
-}
-
-.status-item {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-}
-
-.status-label {
-    color: var(--text-tertiary);
-    font-weight: 700;
-    font-size: 0.7rem;
-}
-
-.status-value {
-    color: var(--text-primary);
-}
-
-.status-divider {
-    width: 1px;
-    height: 16px;
-    background: rgba(255, 255, 255, 0.15);
-}
 
 /* Location Info - Top Center */
 .location-info {

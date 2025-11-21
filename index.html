@@ -31,21 +31,35 @@
     <canvas id="glCanvas"></canvas>
     <div class="canvas-vignette"></div>
 
-    <!-- Floating control toggle button -->
-    <button class="control-toggle-fab" id="controlToggle" aria-label="Toggle controls">
-        <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
-    </button>
+    <!-- Top Right Status & Save Trigger -->
+    <div class="status-container" id="statusTrigger">
+        <div class="status-row">
+            <span class="status-label">X</span>
+            <span class="status-value" id="coordX">0.000000</span>
+        </div>
+        <div class="status-row">
+            <span class="status-label">Y</span>
+            <span class="status-value" id="coordY">0.000000</span>
+        </div>
+        <div class="status-row">
+            <span class="status-label">Z</span>
+            <span class="status-value" id="coordZ">1.0</span>
+        </div>
+        <div class="status-hint">TAP TO SAVE</div>
+    </div>
+
+    <!-- Central Circle Control -->
+    <div class="circle-control-container">
+        <div class="circle-control" id="circleControl">
+            <div class="circle-inner">
+                <div class="circle-icon"></div>
+            </div>
+            <div class="control-guide guide-up">ZOOM IN</div>
+            <div class="control-guide guide-down">ZOOM OUT</div>
+            <div class="control-guide guide-left">LESS DETAIL</div>
+            <div class="control-guide guide-right">MORE DETAIL</div>
+        </div>
+    </div>
 
     <!-- Slide-in control panel (Desktop: from right, Mobile: from bottom) -->
     <div class="control-panel" id="controlPanel">
@@ -102,6 +116,26 @@
                         <div class="palette-preview palette-4"></div>
                         <span class="palette-name">Extreme</span>
                     </button>
+                    <button class="palette-card" data-palette="5" aria-label="Neon">
+                        <div class="palette-preview palette-5"></div>
+                        <span class="palette-name">Neon</span>
+                    </button>
+                    <button class="palette-card" data-palette="6" aria-label="Golden">
+                        <div class="palette-preview palette-6"></div>
+                        <span class="palette-name">Golden</span>
+                    </button>
+                    <button class="palette-card" data-palette="7" aria-label="Cyber">
+                        <div class="palette-preview palette-7"></div>
+                        <span class="palette-name">Cyber</span>
+                    </button>
+                    <button class="palette-card" data-palette="8" aria-label="Ice">
+                        <div class="palette-preview palette-8"></div>
+                        <span class="palette-name">Ice</span>
+                    </button>
+                    <button class="palette-card" data-palette="9" aria-label="Forest">
+                        <div class="palette-preview palette-9"></div>
+                        <span class="palette-name">Forest</span>
+                    </button>
                 </div>
             </div>
 
@@ -154,25 +188,7 @@
                 </div>
             </div>
 
-            <!-- Zoom controls -->
-            <div class="control-section">
-                <label class="section-label">Zoom</label>
-                <div class="zoom-btn-group">
-                    <button id="zoomOutBtn" class="zoom-btn" aria-label="Zoom out">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="8" y1="12" x2="16" y2="12"></line>
-                        </svg>
-                    </button>
-                    <button id="zoomInBtn" class="zoom-btn" aria-label="Zoom in">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="16"></line>
-                            <line x1="8" y1="12" x2="16" y2="12"></line>
-                        </svg>
-                    </button>
-                </div>
-            </div>
+
 
             <!-- Quick actions -->
             <div class="control-section quick-actions">
@@ -206,20 +222,7 @@
         </div>
     </div>
 
-    <!-- Status display (bottom-left) -->
-    <div class="status-display" id="statusDisplay">
-        <!-- HUD Stats Display -->
-        <div id="stats" class="hud-stats">
-            <div class="hud-row">
-                <span class="hud-label">POS</span>
-                <span class="hud-value" id="coordDisplay">X 0.00000 Y 0.00000</span>
-            </div>
-            <div class="hud-row">
-                <span class="hud-label">ZM</span>
-                <span class="hud-value" id="zoomLevel">1.0×</span>
-            </div>
-        </div>
-    </div>
+
 
     <!-- Location info overlay (top-center) -->
     <div class="location-info" id="locationInfo">
@@ -251,34 +254,21 @@
         </div>
     </div>
 
-    <!-- Fidget Zoom Switch -->
-    <div class="fidget-zoom-container">
-        <div class="fidget-track" id="fidgetTrack">
-            <div class="fidget-lock-zone left" id="lockZoneOut">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 12H5M12 19l-7-7 7-7" />
-                </svg>
-            </div>
-            <div class="fidget-lock-zone right" id="lockZoneIn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-            </div>
-            <div class="fidget-knob" id="fidgetKnob">
-                <div class="knob-grip"></div>
-            </div>
-            <!-- Hidden range input for interaction -->
-            <input type="range" id="fidgetInput" min="-100" max="100" value="0" step="1">
-        </div>
-        <div class="fidget-label">Slide to Zoom • Lock at Edges</div>
-    </div>
+
 
     <!-- Save Location Modal -->
     <div id="saveModal" class="modal hidden">
         <div class="modal-content">
-            <h3>Save Location</h3>
-            <p>Name this discovery to add it to your catalogue.</p>
-            <input type="text" id="locationNameInput" placeholder="Enter location name..." maxlength="30">
+            <h3>Save Scene</h3>
+            <p>Name your discovery and set a journey duration.</p>
+            <div class="input-group">
+                <label>Name</label>
+                <input type="text" id="locationNameInput" placeholder="e.g., Cosmic Spiral" maxlength="30">
+            </div>
+            <div class="input-group">
+                <label>Duration (seconds)</label>
+                <input type="number" id="locationDurationInput" value="30" min="5" max="300">
+            </div>
             <div class="modal-actions">
                 <button id="cancelSaveBtn" class="btn-secondary">Cancel</button>
                 <button id="confirmSaveBtn" class="btn-primary">Save & Fly</button>

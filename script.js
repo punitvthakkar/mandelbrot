@@ -230,9 +230,28 @@ const fsSource = `
                 color = palette(t * 15.0, vec3(0.5), vec3(0.5), vec3(2.0, 1.0, 0.0), vec3(0.5, 0.20, 0.25));
             } else if (u_paletteId == 3) {
                 color = palette(t * 8.0, vec3(0.8, 0.5, 0.4), vec3(0.2, 0.4, 0.2), vec3(2.0, 1.0, 1.0), vec3(0.00, 0.25, 0.25));
-            } else {
+            } else if (u_paletteId == 4) {
+                // Extreme (Texture)
                 float cycle = mod(smooth_i, 512.0) / 512.0;
                 color = texture2D(u_paletteTexture, vec2(cycle, 0.5)).rgb;
+            } else if (u_paletteId == 5) {
+                // Neon Nights
+                color = palette(t * 4.0, vec3(0.5), vec3(0.5), vec3(1.0), vec3(0.3, 0.2, 0.2));
+                color = mix(color, vec3(0.0, 1.0, 1.0), sin(t * 10.0) * 0.5 + 0.5);
+            } else if (u_paletteId == 6) {
+                // Golden Hour
+                color = palette(t * 5.0, vec3(0.8, 0.5, 0.4), vec3(0.2, 0.4, 0.2), vec3(2.0, 1.0, 1.0), vec3(0.00, 0.25, 0.25));
+                color += vec3(0.2, 0.1, 0.0); 
+            } else if (u_paletteId == 7) {
+                // Cyberpunk
+                color = palette(t * 6.0, vec3(0.5), vec3(0.5), vec3(2.0, 1.0, 0.0), vec3(0.5, 0.20, 0.25));
+                color = vec3(1.0) - color; // Invert
+            } else if (u_paletteId == 8) {
+                // Ice Age
+                color = palette(t * 12.0, vec3(0.5), vec3(0.5), vec3(1.0, 1.0, 1.0), vec3(0.0, 0.33, 0.67));
+            } else if (u_paletteId == 9) {
+                // Forest Deep
+                color = palette(t * 8.0, vec3(0.2, 0.7, 0.4), vec3(0.5, 0.2, 0.3), vec3(1.0), vec3(0.0, 0.1, 0.0));
             }
             
             gl_FragColor = vec4(color, 1.0);
@@ -286,7 +305,8 @@ let state = {
     tutorialShown: localStorage.getItem('mandelbrot_tutorial_shown') === 'true',
     fidgetZoomVelocity: 0,
     fractalType: 0, // 0: Mandelbrot, 1: Julia, 2: Sierpinski
-    juliaC: { x: -0.7269, y: 0.1889 }
+    juliaC: { x: -0.7269, y: 0.1889 },
+    circleDrag: { active: false, startX: 0, startY: 0, startIter: 0 }
 };
 
 const locations = {
@@ -647,12 +667,13 @@ function updateStats() {
     if (now - state.lastStatsUpdate < state.statsUpdateInterval) return;
     state.lastStatsUpdate = now;
 
-    const coordText = `X ${state.zoomCenter.x.toFixed(5)} Y ${state.zoomCenter.y.toFixed(5)} `;
-    const coordDisplay = document.getElementById('coordDisplay');
-    if (coordDisplay) coordDisplay.innerText = coordText;
+    const elX = document.getElementById('coordX');
+    const elY = document.getElementById('coordY');
+    const elZ = document.getElementById('coordZ');
 
-    const zoomDisplay = document.getElementById('zoomLevel');
-    if (zoomDisplay) zoomDisplay.innerText = `${(3.0 / state.zoomSize).toFixed(1)}×`;
+    if (elX) elX.innerText = state.zoomCenter.x.toFixed(6);
+    if (elY) elY.innerText = state.zoomCenter.y.toFixed(6);
+    if (elZ) elZ.innerText = (3.0 / state.zoomSize).toFixed(1) + '×';
 }
 
 // Visual Catalogue
@@ -662,10 +683,10 @@ function renderCatalogue() {
     container.innerHTML = '';
 
     const currentLocations = locations[state.fractalType] || [];
-    
+
     // Load saved locations from localStorage
     const savedLocations = JSON.parse(localStorage.getItem('fractonaut_saved_locations') || '[]');
-    
+
     // Combine predefined and saved locations
     const allLocations = [...currentLocations, ...savedLocations];
 
@@ -796,6 +817,199 @@ canvas.addEventListener('wheel', (e) => {
     handleZoom(delta, e.clientX, e.clientY);
 }, { passive: false });
 
+// Circle Control Logic
+function initCircleControl() {
+    const circle = document.getElementById('circleControl');
+    if (!circle) return;
+
+    const handleStart = (x, y) => {
+        state.circleDrag.active = true;
+        state.circleDrag.startX = x;
+        state.circleDrag.startY = y;
+        state.circleDrag.startIter = state.maxIterations;
+        circle.classList.add('dragging');
+    };
+
+    const handleMove = (x, y) => {
+        if (!state.circleDrag.active) return;
+
+        const dx = x - state.circleDrag.startX;
+        const dy = y - state.circleDrag.startY;
+
+        // Vertical Drag -> Zoom
+        // Pull UP (negative dy) -> Zoom IN
+        // Pull DOWN (positive dy) -> Zoom OUT
+        if (Math.abs(dy) > 10) {
+            const zoomDelta = -dy * 0.05; // Sensitivity
+            handleZoom(zoomDelta);
+        }
+
+        // Horizontal Drag -> Detail (Iterations)
+        // Drag RIGHT (positive dx) -> Increase Detail
+        // Drag LEFT (negative dx) -> Decrease Detail
+        if (Math.abs(dx) > 10) {
+            const iterDelta = Math.floor(dx * 2);
+            let newIter = state.circleDrag.startIter + iterDelta;
+            newIter = Math.max(50, Math.min(5000, newIter)); // Clamp
+            state.maxIterations = newIter;
+
+            // Update UI
+            const iterInput = document.getElementById('iterations');
+            const iterDisplay = document.getElementById('iterValue');
+            if (iterInput) iterInput.value = newIter;
+            if (iterDisplay) iterDisplay.innerText = newIter;
+        }
+
+        // Visual Feedback
+        const inner = circle.querySelector('.circle-inner');
+        if (inner) {
+            const moveX = Math.max(-15, Math.min(15, dx * 0.2));
+            const moveY = Math.max(-15, Math.min(15, dy * 0.2));
+            inner.style.transform = `translate(${moveX}px, ${moveY}px)`;
+        }
+    };
+
+    const handleEnd = () => {
+        if (!state.circleDrag.active) return;
+
+        // Check for Tap (minimal movement)
+        const wasTap = !circle.querySelector('.circle-inner').style.transform ||
+            circle.querySelector('.circle-inner').style.transform === 'translate(0px, 0px)';
+
+        state.circleDrag.active = false;
+        circle.classList.remove('dragging');
+
+        const inner = circle.querySelector('.circle-inner');
+        if (inner) inner.style.transform = '';
+
+        if (wasTap) {
+            toggleControlPanel();
+        }
+    };
+
+    // Touch Events
+    circle.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        handleStart(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+        if (state.circleDrag.active) {
+            e.preventDefault(); // Prevent scroll
+            const touch = e.touches[0];
+            handleMove(touch.clientX, touch.clientY);
+        }
+    }, { passive: false });
+
+    window.addEventListener('touchend', handleEnd);
+
+    // Mouse Events
+    circle.addEventListener('mousedown', (e) => {
+        handleStart(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        handleMove(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('mouseup', handleEnd);
+}
+
+function toggleControlPanel() {
+    const panel = document.getElementById('controlPanel');
+    panel.classList.toggle('visible');
+    state.panelVisible = panel.classList.contains('visible');
+}
+
+// Save System & URL Logic
+function initSaveSystem() {
+    const trigger = document.getElementById('statusTrigger');
+    const modal = document.getElementById('saveModal');
+    const cancelBtn = document.getElementById('cancelSaveBtn');
+    const confirmBtn = document.getElementById('confirmSaveBtn');
+
+    if (trigger) {
+        trigger.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+        });
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+    }
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+            const name = document.getElementById('locationNameInput').value || 'Untitled Scene';
+            const duration = document.getElementById('locationDurationInput').value || 30;
+            saveScene(name, duration);
+            modal.classList.add('hidden');
+        });
+    }
+
+    // Check URL Params on Load
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('x') && params.has('y') && params.has('z')) {
+        state.zoomCenter.x = parseFloat(params.get('x'));
+        state.zoomCenter.y = parseFloat(params.get('y'));
+        state.zoomSize = 3.0 / parseFloat(params.get('z'));
+        state.maxIterations = parseInt(params.get('i')) || 500;
+        state.paletteId = parseInt(params.get('p')) || 0;
+        state.fractalType = parseInt(params.get('f')) || 0;
+
+        state.targetZoomCenter = { ...state.zoomCenter };
+        state.targetZoomSize = state.zoomSize;
+    }
+}
+
+function saveScene(name, duration) {
+    // 1. Generate URL
+    const zoom = 3.0 / state.zoomSize;
+    const params = new URLSearchParams({
+        x: state.zoomCenter.x.toFixed(6),
+        y: state.zoomCenter.y.toFixed(6),
+        z: zoom.toFixed(2),
+        i: state.maxIterations,
+        p: state.paletteId,
+        f: state.fractalType
+    });
+    const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+
+    // 2. Save to LocalStorage (Catalogue)
+    const newLoc = {
+        id: Date.now().toString(),
+        title: name,
+        description: `Duration: ${duration}s`,
+        x: state.zoomCenter.x,
+        y: state.zoomCenter.y,
+        zoom: zoom,
+        iterations: state.maxIterations,
+        paletteId: state.paletteId,
+        duration: duration
+    };
+
+    const saved = JSON.parse(localStorage.getItem('fractonaut_saved_locations') || '[]');
+    saved.push(newLoc);
+    localStorage.setItem('fractonaut_saved_locations', JSON.stringify(saved));
+
+    // 3. Refresh Catalogue
+    renderCatalogue();
+
+    // 4. Copy URL to Clipboard (Feedback)
+    navigator.clipboard.writeText(url).then(() => {
+        alert('Scene saved & URL copied to clipboard!');
+    }).catch(() => {
+        alert('Scene saved! (Could not copy URL)');
+    });
+}
+
+// Initialize
+initCircleControl();
+initSaveSystem();
+
 let lastClickTime = 0;
 let lastClickPos = { x: 0, y: 0 };
 
@@ -917,122 +1131,7 @@ canvas.addEventListener('touchend', (e) => {
     }
 });
 
-// --- Fidget Zoom Switch Logic ---
-const fidgetTrack = document.getElementById('fidgetTrack');
-const fidgetKnob = document.getElementById('fidgetKnob');
-const fidgetInput = document.getElementById('fidgetInput');
-const lockZoneOut = document.getElementById('lockZoneOut');
-const lockZoneIn = document.getElementById('lockZoneIn');
 
-let fidgetState = {
-    locked: false,
-    maxTravel: 0
-};
-
-function initFidgetSwitch() {
-    const trackRect = fidgetTrack.getBoundingClientRect();
-    const knobRect = fidgetKnob.getBoundingClientRect();
-    fidgetState.maxTravel = (trackRect.width / 2) - (knobRect.width / 2);
-}
-
-window.addEventListener('resize', initFidgetSwitch);
-initFidgetSwitch();
-
-function updateFidgetVisuals(value) {
-    // Value is -100 to 100
-    // Map to pixels
-    const px = (value / 100) * fidgetState.maxTravel;
-    fidgetKnob.style.transform = `translateX(calc(-50 % + ${px}px))`;
-
-    // Lock zones
-    if (value > 85) {
-        lockZoneIn.classList.add('active');
-        lockZoneOut.classList.remove('active');
-    } else if (value < -85) {
-        lockZoneOut.classList.add('active');
-        lockZoneIn.classList.remove('active');
-    } else {
-        lockZoneIn.classList.remove('active');
-        lockZoneOut.classList.remove('active');
-    }
-
-    if (fidgetState.locked) {
-        fidgetKnob.classList.add('locked');
-    } else {
-        fidgetKnob.classList.remove('locked');
-    }
-}
-
-// Input Event: Fires continuously while dragging
-fidgetInput.addEventListener('input', (e) => {
-    const value = parseInt(e.target.value);
-
-    // If locked and user drags back towards center, unlock
-    if (fidgetState.locked) {
-        if ((fidgetState.locked === 'in' && value < 90) ||
-            (fidgetState.locked === 'out' && value > -90)) {
-            fidgetState.locked = false;
-        }
-    }
-
-    updateFidgetVisuals(value);
-
-    // Calculate velocity
-    // Deadzone around 0
-    if (Math.abs(value) > 5) {
-        const direction = -Math.sign(value); // Right (positive val) = Zoom In (negative delta)
-        const intensity = (Math.abs(value) - 5) / 95;
-        const speed = intensity * intensity; // Quadratic curve
-
-        state.fidgetZoomVelocity = direction * speed;
-    } else {
-        state.fidgetZoomVelocity = 0;
-    }
-});
-
-// Change Event: Fires on release
-fidgetInput.addEventListener('change', (e) => {
-    const value = parseInt(e.target.value);
-
-    if (Math.abs(value) > 85) {
-        // Lock In
-        const lockVal = value > 0 ? 100 : -100;
-        fidgetInput.value = lockVal;
-        fidgetState.locked = value > 0 ? 'in' : 'out';
-
-        updateFidgetVisuals(lockVal);
-
-        // Set max velocity
-        const direction = value > 0 ? -1 : 1;
-        state.fidgetZoomVelocity = direction * 1.0;
-
-        if (navigator.vibrate) navigator.vibrate(20);
-    } else {
-        // Snap back
-        fidgetInput.value = 0;
-        fidgetState.locked = false;
-        state.fidgetZoomVelocity = 0;
-        updateFidgetVisuals(0);
-
-        // Spring animation handled by CSS transition on knob?
-        // We need to temporarily enable transition on the knob for the snap back
-        fidgetKnob.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-        setTimeout(() => {
-            fidgetKnob.style.transition = 'none'; // Disable for next drag
-        }, 300);
-    }
-});
-
-// Reset transition on drag start
-fidgetInput.addEventListener('mousedown', () => {
-    fidgetKnob.style.transition = 'none';
-});
-fidgetInput.addEventListener('touchstart', () => {
-    fidgetKnob.style.transition = 'none';
-}, { passive: true });
-
-// Integrate into draw loop
-state.fidgetZoomVelocity = 0;
 
 // UI Controls - Panel Toggle with Auto-Hide
 function togglePanel(forceState) {
@@ -1054,9 +1153,7 @@ function togglePanel(forceState) {
     }
 }
 
-document.getElementById('controlToggle').addEventListener('click', () => {
-    togglePanel();
-});
+
 
 document.getElementById('panelClose').addEventListener('click', () => {
     togglePanel(false);
@@ -1078,90 +1175,69 @@ document.querySelectorAll('.palette-card').forEach(btn => {
 
 // Removed obsolete locationSelect listener
 
-document.getElementById('resetBtn').addEventListener('click', () => {
-    state.velocity = { x: 0, y: 0 };
-    state.maxIterations = 500;
-    state.paletteId = 0;
+// Quick Actions
+const resetBtn = document.getElementById('resetBtn');
+if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+        state.velocity = { x: 0, y: 0 };
+        state.maxIterations = 500;
+        state.paletteId = 0;
 
-    if (state.fractalType === 2) { // Sierpinski
-        state.targetZoomCenter = { x: 0.5, y: 0.288 };
-        state.targetZoomSize = 1.5;
-        state.maxIterations = 200;
-    } else if (state.fractalType === 1) { // Julia
-        state.targetZoomCenter = { x: 0.0, y: 0.0 };
-        state.targetZoomSize = 3.0;
-    } else { // Mandelbrot
-        state.targetZoomCenter = { x: -0.75, y: 0.0 };
-        state.targetZoomSize = 3.0;
-    }
+        if (state.fractalType === 2) { // Sierpinski
+            state.targetZoomCenter = { x: 0.5, y: 0.288 };
+            state.targetZoomSize = 1.5;
+            state.maxIterations = 200;
+        } else if (state.fractalType === 1) { // Julia
+            state.targetZoomCenter = { x: 0.0, y: 0.0 };
+            state.targetZoomSize = 3.0;
+        } else { // Mandelbrot
+            state.targetZoomCenter = { x: -0.75, y: 0.0 };
+            state.targetZoomSize = 3.0;
+        }
 
-    state.zoomCenter = { ...state.targetZoomCenter };
-    state.zoomSize = state.targetZoomSize;
+        state.zoomCenter = { ...state.targetZoomCenter };
+        state.zoomSize = state.targetZoomSize;
 
-    // Reset UI controls
-    document.getElementById('iterations').value = state.maxIterations;
-    document.getElementById('iterValue').innerText = state.maxIterations;
-    document.querySelectorAll('.palette-card').forEach(c => c.classList.remove('active'));
-    document.querySelector('.palette-card[data-palette="0"]').classList.add('active');
-});
+        // Reset UI controls
+        document.getElementById('iterations').value = state.maxIterations;
+        document.getElementById('iterValue').innerText = state.maxIterations;
+        document.querySelectorAll('.palette-card').forEach(c => c.classList.remove('active'));
+        document.querySelector('.palette-card[data-palette="0"]').classList.add('active');
+    });
+}
 
-document.getElementById('screenshotBtn').addEventListener('click', () => {
-    const link = document.createElement('a');
-    link.download = `mandelbrot - ${Date.now()}.png`;
-    link.href = canvas.toDataURL();
-    link.click();
-});
+const screenshotBtn = document.getElementById('screenshotBtn');
+if (screenshotBtn) {
+    screenshotBtn.addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.download = `mandelbrot - ${Date.now()}.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+    });
+}
 
-document.getElementById('fullscreenBtn').addEventListener('click', () => {
-    toggleFullscreen();
-});
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+if (fullscreenBtn) {
+    fullscreenBtn.addEventListener('click', () => {
+        toggleFullscreen();
+    });
+}
 
 function toggleFullscreen() {
     if (!document.fullscreenElement) {
         document.body.requestFullscreen().catch(err => {
             console.error(`Fullscreen error: ${err.message} `);
         });
-        document.getElementById('fullscreenLabel').innerText = 'Exit';
+        const label = document.getElementById('fullscreenLabel');
+        if (label) label.innerText = 'Exit';
     } else {
         document.exitFullscreen();
-        document.getElementById('fullscreenLabel').innerText = 'Full';
+        const label = document.getElementById('fullscreenLabel');
+        if (label) label.innerText = 'Full';
     }
 }
 
-// Zoom buttons
-let zoomInterval = null;
 
-function startZoom(direction) {
-    handleZoom(direction);
-    zoomInterval = setInterval(() => {
-        handleZoom(direction);
-    }, 50);
-}
-
-function stopZoom() {
-    if (zoomInterval) {
-        clearInterval(zoomInterval);
-        zoomInterval = null;
-    }
-}
-
-document.getElementById('zoomInBtn').addEventListener('mousedown', () => startZoom(-1));
-document.getElementById('zoomInBtn').addEventListener('mouseup', stopZoom);
-document.getElementById('zoomInBtn').addEventListener('mouseleave', stopZoom);
-document.getElementById('zoomInBtn').addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    startZoom(-1);
-});
-document.getElementById('zoomInBtn').addEventListener('touchend', stopZoom);
-
-document.getElementById('zoomOutBtn').addEventListener('mousedown', () => startZoom(1));
-document.getElementById('zoomOutBtn').addEventListener('mouseup', stopZoom);
-document.getElementById('zoomOutBtn').addEventListener('mouseleave', stopZoom);
-document.getElementById('zoomOutBtn').addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    startZoom(1);
-});
-document.getElementById('zoomOutBtn').addEventListener('touchend', stopZoom);
 
 // Keyboard shortcuts (desktop only)
 document.addEventListener('keydown', (e) => {
@@ -1221,8 +1297,8 @@ const closePwaBtn = document.getElementById('pwaCloseBtn');
 // Check if app is already installed (standalone mode)
 function isAppInstalled() {
     return window.matchMedia('(display-mode: standalone)').matches ||
-           window.navigator.standalone === true ||
-           document.referrer.includes('android-app://');
+        window.navigator.standalone === true ||
+        document.referrer.includes('android-app://');
 }
 
 // Check if prompt was dismissed
@@ -1305,64 +1381,7 @@ if (isAppInstalled() || wasPromptDismissed()) {
 }
 
 // --- HUD & Save Location Logic ---
-const statsDisplay = document.getElementById('stats');
-const saveModal = document.getElementById('saveModal');
-const locationNameInput = document.getElementById('locationNameInput');
-const cancelSaveBtn = document.getElementById('cancelSaveBtn');
-const confirmSaveBtn = document.getElementById('confirmSaveBtn');
 
-// Load saved locations (they're stored in localStorage and loaded in renderCatalogue)
-renderCatalogue(); // Re-render with saved locations
-
-statsDisplay.addEventListener('click', () => {
-    // Copy coordinates
-    const text = `x: ${state.zoomCenter.x}, y: ${state.zoomCenter.y}, z: ${state.zoomSize} `;
-    navigator.clipboard.writeText(text).then(() => {
-        // Show modal
-        saveModal.classList.remove('hidden');
-        locationNameInput.value = '';
-        locationNameInput.focus();
-    });
-});
-
-cancelSaveBtn.addEventListener('click', () => {
-    saveModal.classList.add('hidden');
-});
-
-confirmSaveBtn.addEventListener('click', () => {
-    const name = locationNameInput.value.trim();
-    if (!name) return;
-
-    const newLoc = {
-        id: `custom_${Date.now()} `,
-        title: name,
-        description: `Custom saved location.`,
-        x: state.zoomCenter.x,
-        y: state.zoomCenter.y,
-        zoom: 3.0 / state.zoomSize,
-        iterations: state.maxIterations,
-        paletteId: state.paletteId
-    };
-
-    // Save to local storage
-    const currentSaved = JSON.parse(localStorage.getItem('fractonaut_saved_locations') || '[]');
-    currentSaved.push(newLoc);
-    localStorage.setItem('fractonaut_saved_locations', JSON.stringify(currentSaved));
-
-    // Refresh catalogue
-    renderCatalogue();
-
-    // Close modal & Fly to it (confirming it works)
-    saveModal.classList.add('hidden');
-    startHypnoticJourney(newLoc);
-});
-
-// Close modal on outside click
-saveModal.addEventListener('click', (e) => {
-    if (e.target === saveModal) {
-        saveModal.classList.add('hidden');
-    }
-});
 
 // Start rendering
 // --- Explore Tabs & Fractal Switching ---
