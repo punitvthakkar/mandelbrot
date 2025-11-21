@@ -230,41 +230,55 @@ let state = {
     friction: 0.9,
     isAnimating: false,
     panelVisible: false,
-    tourActive: false,
-    tourStep: 0,
     lastStatsUpdate: 0,
     statsUpdateInterval: 100,
     autoHideTimer: null,
-    tutorialShown: localStorage.getItem('mandelbrot_tutorial_shown') === 'true'
+    tutorialShown: localStorage.getItem('mandelbrot_tutorial_shown') === 'true',
+    fidgetZoomVelocity: 0
 };
 
-const locations = {
-    default: {
-        x: -0.75, y: 0.0, size: 3.0,
-        title: 'Home View',
-        description: 'The complete Mandelbrot set in its iconic form'
+const locations = [
+    {
+        id: 'rising_up',
+        title: 'Rising Up',
+        description: 'A journey to the upper regions.',
+        x: -1.47853,
+        y: -0.00307,
+        zoom: 26263.8,
+        iterations: 800,
+        paletteId: 2 // Aurora
     },
-    seahorse: {
-        x: -0.748, y: 0.1, size: 0.01,
-        title: 'Seahorse Valley',
-        description: 'Delicate tendrils spiral into intricate seahorse-like patterns'
+    {
+        id: 'elephant_saw_me',
+        title: 'The Elephant Saw Me',
+        description: 'Deep inside the Elephant Valley.',
+        x: 0.35506,
+        y: -0.06286,
+        zoom: 6043.3,
+        iterations: 200,
+        paletteId: 0 // Ocean
     },
-    elephant: {
-        x: 0.275, y: 0.0, size: 0.01,
-        title: 'Elephant Valley',
-        description: 'Bulbous spirals reminiscent of elephant trunks'
+    {
+        id: 'hello_jellyfish',
+        title: 'Hello Jellyfish',
+        description: 'Tentacles of infinite complexity.',
+        x: -0.73722,
+        y: 0.20866,
+        zoom: 6146.2,
+        iterations: 650,
+        paletteId: 4 // Extreme
     },
-    spiral: {
-        x: -0.088, y: 0.654, size: 0.005,
-        title: 'Triple Spiral',
-        description: 'A hypnotic vortex of three intertwined spirals'
-    },
-    minibrot: {
-        x: -1.75, y: 0.0, size: 0.1,
-        title: 'Mini Mandelbrot',
-        description: 'A perfect miniature copy of the full set—fractal self-similarity'
+    {
+        id: 'three_arms',
+        title: 'The Three Arms',
+        description: 'A spiraling trifecta.',
+        x: -0.05154,
+        y: 0.83636,
+        zoom: 1460.9,
+        iterations: 300,
+        paletteId: 1 // Magma
     }
-};
+];
 
 // Shader Program Setup
 function loadShader(gl, type, source) {
@@ -489,25 +503,101 @@ function updateStats() {
     if (now - state.lastStatsUpdate < state.statsUpdateInterval) return;
     state.lastStatsUpdate = now;
 
-    document.getElementById('coordX').innerText = state.zoomCenter.x.toFixed(5);
-    document.getElementById('coordY').innerText = state.zoomCenter.y.toFixed(5);
-    document.getElementById('zoomLevel').innerText = `${(3.0 / state.zoomSize).toFixed(1)}×`;
+    const coordText = `X ${state.zoomCenter.x.toFixed(5)} Y ${state.zoomCenter.y.toFixed(5)}`;
+    const coordDisplay = document.getElementById('coordDisplay');
+    if (coordDisplay) coordDisplay.innerText = coordText;
+
+    const zoomDisplay = document.getElementById('zoomLevel');
+    if (zoomDisplay) zoomDisplay.innerText = `${(3.0 / state.zoomSize).toFixed(1)}×`;
 }
 
-function updateLocationInfo(locationKey) {
-    const loc = locations[locationKey];
-    if (!loc) return;
+// Visual Catalogue
+function renderCatalogue() {
+    const container = document.getElementById('visualCatalogue');
+    if (!container) return;
+    container.innerHTML = '';
 
-    document.getElementById('locationTitle').innerText = loc.title;
-    document.getElementById('locationDescription').innerText = loc.description;
-
-    const infoPanel = document.getElementById('locationInfo');
-    infoPanel.classList.add('visible');
-
-    setTimeout(() => {
-        infoPanel.classList.remove('visible');
-    }, 4000);
+    locations.forEach(loc => {
+        const item = document.createElement('div');
+        item.className = 'catalogue-item';
+        item.innerHTML = `
+            <h4>${loc.title}</h4>
+            <p>${loc.description}</p>
+            <div class="meta">
+                <span>Zoom: ${loc.zoom}x</span>
+                <span>Iter: ${loc.iterations}</span>
+            </div>
+        `;
+        item.onclick = () => startHypnoticJourney(loc);
+        container.appendChild(item);
+    });
 }
+
+function startHypnoticJourney(loc) {
+    const durationInput = document.getElementById('journeyDuration');
+    const duration = parseFloat(durationInput.value) || 10;
+
+    // 1. Reset to Home Zoom but Target Location
+    state.zoomCenter = { x: loc.x, y: loc.y };
+    state.zoomSize = 3.0;
+    state.targetZoomCenter = { x: loc.x, y: loc.y };
+    state.targetZoomSize = 3.0;
+
+    // 2. Set Color & Detail
+    state.paletteId = loc.paletteId;
+    state.maxIterations = loc.iterations;
+
+    // Update UI controls to match
+    document.getElementById('iterations').value = loc.iterations;
+    document.getElementById('iterValue').innerText = loc.iterations;
+    document.querySelectorAll('.palette-card').forEach(c => c.classList.remove('active'));
+    const paletteBtn = document.querySelector(`.palette-card[data-palette="${loc.paletteId}"]`);
+    if (paletteBtn) paletteBtn.classList.add('active');
+
+    // 3. Animate Zoom Only
+    state.isAnimating = true;
+    const startTime = Date.now();
+    const startSize = 3.0;
+    const targetSize = 3.0 / loc.zoom;
+
+    function animate() {
+        const now = Date.now();
+        const elapsed = (now - startTime) / 1000;
+        const t = Math.min(elapsed / duration, 1.0);
+
+        // Smooth easing
+        const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+        // Interpolate Zoom (Logarithmic)
+        const logStart = Math.log(startSize);
+        const logEnd = Math.log(targetSize);
+        const currentLog = logStart + (logEnd - logStart) * ease;
+
+        state.targetZoomSize = Math.exp(currentLog);
+        state.zoomSize = state.targetZoomSize;
+
+        // Ensure center stays locked
+        state.targetZoomCenter.x = loc.x;
+        state.targetZoomCenter.y = loc.y;
+        state.zoomCenter.x = loc.x;
+        state.zoomCenter.y = loc.y;
+
+        if (t < 1.0) {
+            requestAnimationFrame(animate);
+        } else {
+            state.isAnimating = false;
+        }
+    }
+
+    animate();
+
+    // Close panel on all devices
+    document.getElementById('controlPanel').classList.remove('visible');
+    document.getElementById('controlToggle').classList.remove('hidden'); // Ensure toggle comes back
+}
+
+// Initialize Catalogue
+renderCatalogue();
 
 // Context-aware zoom with screen size adaptation
 function handleZoom(delta, x, y) {
@@ -852,27 +942,22 @@ document.querySelectorAll('.palette-card').forEach(btn => {
     });
 });
 
-document.getElementById('locationSelect').addEventListener('change', (e) => {
-    const loc = locations[e.target.value];
-    if (loc) {
-        state.isAnimating = true;
-        state.velocity = { x: 0, y: 0 };
-
-        state.targetZoomCenter = { x: loc.x, y: loc.y };
-        state.targetZoomSize = loc.size;
-
-        updateLocationInfo(e.target.value);
-
-        setTimeout(() => { state.isAnimating = false; }, 1000);
-    }
-});
+// Removed obsolete locationSelect listener
 
 document.getElementById('resetBtn').addEventListener('click', () => {
     state.targetZoomCenter = { x: -0.75, y: 0.0 };
     state.targetZoomSize = 3.0;
     state.velocity = { x: 0, y: 0 };
-    document.getElementById('locationSelect').value = 'default';
-    updateLocationInfo('default');
+    state.zoomCenter = { x: -0.75, y: 0.0 };
+    state.zoomSize = 3.0;
+    state.maxIterations = 500;
+    state.paletteId = 0;
+
+    // Reset UI controls
+    document.getElementById('iterations').value = 500;
+    document.getElementById('iterValue').innerText = 500;
+    document.querySelectorAll('.palette-card').forEach(c => c.classList.remove('active'));
+    document.querySelector('.palette-card[data-palette="0"]').classList.add('active');
 });
 
 document.getElementById('screenshotBtn').addEventListener('click', () => {
@@ -942,67 +1027,13 @@ document.addEventListener('keydown', (e) => {
         case 'c':
             togglePanel();
             break;
-        case 'r':
-        case 't':
-            document.getElementById('autoTourBtn').click();
-            break;
         case 'escape':
             togglePanel(false);
             break;
     }
 });
 
-// Auto Tour
-const tourLocations = ['default', 'seahorse', 'elephant', 'spiral', 'minibrot'];
-let tourTimeout = null;
-
-function startTour() {
-    state.tourActive = true;
-    state.tourStep = 0;
-    document.getElementById('tourLabel').innerText = 'Stop';
-    document.getElementById('autoTourBtn').classList.add('active');
-    tourNextLocation();
-}
-
-function stopTour() {
-    state.tourActive = false;
-    document.getElementById('tourLabel').innerText = 'Tour';
-    document.getElementById('autoTourBtn').classList.remove('active');
-    if (tourTimeout) {
-        clearTimeout(tourTimeout);
-        tourTimeout = null;
-    }
-}
-
-function tourNextLocation() {
-    if (!state.tourActive) return;
-
-    const locationKey = tourLocations[state.tourStep];
-    const loc = locations[locationKey];
-
-    state.isAnimating = true;
-    state.velocity = { x: 0, y: 0 };
-    state.targetZoomCenter = { x: loc.x, y: loc.y };
-    state.targetZoomSize = loc.size;
-
-    document.getElementById('locationSelect').value = locationKey;
-    updateLocationInfo(locationKey);
-
-    state.tourStep = (state.tourStep + 1) % tourLocations.length;
-
-    tourTimeout = setTimeout(() => {
-        state.isAnimating = false;
-        tourTimeout = setTimeout(tourNextLocation, 3000);
-    }, 2000);
-}
-
-document.getElementById('autoTourBtn').addEventListener('click', () => {
-    if (state.tourActive) {
-        stopTour();
-    } else {
-        startTour();
-    }
-});
+// Auto Tour logic removed
 
 // Gesture Tutorial (mobile first-time)
 function showTutorial() {
@@ -1034,7 +1065,104 @@ window.addEventListener('resize', () => {
 });
 
 // Initialize
-updateLocationInfo('default');
+// updateLocationInfo('default'); removed
+
+// --- PWA Install Logic ---
+let deferredPrompt;
+const pwaPrompt = document.getElementById('pwaInstallPrompt');
+const installBtn = document.getElementById('pwaInstallBtn');
+const closePwaBtn = document.getElementById('pwaCloseBtn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing on mobile
+    e.preventDefault();
+    // Stash the event so it can be triggered later.
+    deferredPrompt = e;
+
+    // Show prompt only on mobile/tablet widths
+    if (window.innerWidth < 768) {
+        setTimeout(() => {
+            pwaPrompt.classList.remove('hidden');
+        }, 3000);
+    }
+});
+
+installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    pwaPrompt.classList.add('hidden');
+});
+
+closePwaBtn.addEventListener('click', () => {
+    pwaPrompt.classList.add('hidden');
+});
+
+// --- HUD & Save Location Logic ---
+const statsDisplay = document.getElementById('stats');
+const saveModal = document.getElementById('saveModal');
+const locationNameInput = document.getElementById('locationNameInput');
+const cancelSaveBtn = document.getElementById('cancelSaveBtn');
+const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+
+// Load saved locations
+const savedLocations = JSON.parse(localStorage.getItem('fractonaut_saved_locations') || '[]');
+savedLocations.forEach(loc => locations.push(loc));
+renderCatalogue(); // Re-render with saved locations
+
+statsDisplay.addEventListener('click', () => {
+    // Copy coordinates
+    const text = `x: ${state.zoomCenter.x}, y: ${state.zoomCenter.y}, z: ${state.zoomSize}`;
+    navigator.clipboard.writeText(text).then(() => {
+        // Show modal
+        saveModal.classList.remove('hidden');
+        locationNameInput.value = '';
+        locationNameInput.focus();
+    });
+});
+
+cancelSaveBtn.addEventListener('click', () => {
+    saveModal.classList.add('hidden');
+});
+
+confirmSaveBtn.addEventListener('click', () => {
+    const name = locationNameInput.value.trim();
+    if (!name) return;
+
+    const newLoc = {
+        id: `custom_${Date.now()}`,
+        title: name,
+        description: `Custom saved location.`,
+        x: state.zoomCenter.x,
+        y: state.zoomCenter.y,
+        zoom: 3.0 / state.zoomSize,
+        iterations: state.maxIterations,
+        paletteId: state.paletteId
+    };
+
+    // Add to locations array
+    locations.push(newLoc);
+
+    // Save to local storage
+    const currentSaved = JSON.parse(localStorage.getItem('fractonaut_saved_locations') || '[]');
+    currentSaved.push(newLoc);
+    localStorage.setItem('fractonaut_saved_locations', JSON.stringify(currentSaved));
+
+    // Refresh catalogue
+    renderCatalogue();
+
+    // Close modal & Fly to it (confirming it works)
+    saveModal.classList.add('hidden');
+    startHypnoticJourney(newLoc);
+});
+
+// Close modal on outside click
+saveModal.addEventListener('click', (e) => {
+    if (e.target === saveModal) {
+        saveModal.classList.add('hidden');
+    }
+});
 
 // Start rendering
 requestAnimationFrame(drawScene);

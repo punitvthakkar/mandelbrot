@@ -6,7 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description"
         content="Explore the infinite beauty of the Mandelbrot set with an immersive, interactive fractal viewer">
-    <title>Mandelbrot Explorer — Infinite Fractals</title>
+    <title>Fractonaut</title>
+
+    <!-- PWA & Icons -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="256.png">
+    <link rel="apple-touch-icon" href="256.png">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -58,52 +67,14 @@
 
         <!-- Control sections -->
         <div class="panel-content">
-            <!-- Quick actions -->
-            <div class="control-section quick-actions">
-                <div class="action-grid">
-                    <button id="resetBtn" class="action-btn primary" title="Reset to home view">
-                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
-                            <path d="M21 3v5h-5"></path>
-                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
-                        </svg>
-                        <span>Reset</span>
-                    </button>
-                    <button id="screenshotBtn" class="action-btn secondary" title="Save current view">
-                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
-                            </path>
-                            <circle cx="12" cy="13" r="4"></circle>
-                        </svg>
-                        <span>Save</span>
-                    </button>
-                    <button id="fullscreenBtn" class="action-btn secondary" title="Toggle fullscreen">
-                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path
-                                d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3">
-                            </path>
-                        </svg>
-                        <span id="fullscreenLabel">Full</span>
-                    </button>
-                    <button id="autoTourBtn" class="action-btn secondary" title="Auto-tour locations">
-                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                        </svg>
-                        <span id="tourLabel">Tour</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Location presets -->
+            <!-- Detail level -->
             <div class="control-section">
-                <label class="section-label">Explore Locations</label>
-                <select id="locationSelect" class="styled-select">
-                    <option value="default">Home View — The full set</option>
-                    <option value="seahorse">Seahorse Valley — Delicate tendrils</option>
-                    <option value="elephant">Elephant Valley — Bulbous spirals</option>
-                    <option value="spiral">Triple Spiral — Hypnotic vortex</option>
-                    <option value="minibrot">Mini Mandelbrot — Fractal echo</option>
-                </select>
+                <label class="section-label">
+                    <span>Detail Level</span>
+                    <span class="value-display" id="iterValue">500</span>
+                </label>
+                <input type="range" id="iterations" class="styled-range" min="100" max="2000" value="500" step="50">
+                <small class="hint-text">Higher values reveal finer structures</small>
             </div>
 
             <!-- Color palette -->
@@ -133,14 +104,18 @@
                 </div>
             </div>
 
-            <!-- Detail level -->
+            <!-- Visual Catalogue -->
             <div class="control-section">
                 <label class="section-label">
-                    <span>Detail Level</span>
-                    <span class="value-display" id="iterValue">500</span>
+                    <span>Explore Locations</span>
+                    <div class="duration-control">
+                        <label for="journeyDuration">Duration (s):</label>
+                        <input type="number" id="journeyDuration" class="styled-input" value="30" min="1" max="60">
+                    </div>
                 </label>
-                <input type="range" id="iterations" class="styled-range" min="100" max="2000" value="500" step="50">
-                <small class="hint-text">Higher values reveal finer structures</small>
+                <div id="visualCatalogue" class="catalogue-grid">
+                    <!-- Populated by JS -->
+                </div>
             </div>
 
             <!-- Zoom controls -->
@@ -162,24 +137,51 @@
                     </button>
                 </div>
             </div>
+
+            <!-- Quick actions -->
+            <div class="control-section quick-actions">
+                <div class="action-grid">
+                    <button id="resetBtn" class="action-btn primary" title="Reset to home view">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                            <path d="M21 3v5h-5"></path>
+                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                        </svg>
+                        <span>Reset</span>
+                    </button>
+                    <button id="screenshotBtn" class="action-btn secondary" title="Save current view">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                            </path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        <span>Save</span>
+                    </button>
+                    <button id="fullscreenBtn" class="action-btn secondary" title="Toggle fullscreen">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path
+                                d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3">
+                            </path>
+                        </svg>
+                        <span id="fullscreenLabel">Full</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Status display (bottom-left) -->
     <div class="status-display" id="statusDisplay">
-        <div class="status-item">
-            <span class="status-label">X</span>
-            <span class="status-value" id="coordX">-0.75000</span>
-        </div>
-        <div class="status-divider"></div>
-        <div class="status-item">
-            <span class="status-label">Y</span>
-            <span class="status-value" id="coordY">0.00000</span>
-        </div>
-        <div class="status-divider"></div>
-        <div class="status-item">
-            <span class="status-label">Z</span>
-            <span class="status-value" id="zoomLevel">1.0×</span>
+        <!-- HUD Stats Display -->
+        <div id="stats" class="hud-stats">
+            <div class="hud-row">
+                <span class="hud-label">POS</span>
+                <span class="hud-value" id="coordDisplay">X 0.00000 Y 0.00000</span>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label">ZM</span>
+                <span class="hud-value" id="zoomLevel">1.0×</span>
+            </div>
         </div>
     </div>
 
@@ -237,6 +239,32 @@
 
     <!-- Zoom focus ring -->
     <div class="zoom-focus-ring" id="zoomFocusRing"></div>
+
+    <!-- Save Location Modal -->
+    <div id="saveModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Save Location</h3>
+            <p>Name this discovery to add it to your catalogue.</p>
+            <input type="text" id="locationNameInput" placeholder="Enter location name..." maxlength="30">
+            <div class="modal-actions">
+                <button id="cancelSaveBtn" class="btn-secondary">Cancel</button>
+                <button id="confirmSaveBtn" class="btn-primary">Save & Fly</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PWA Install Prompt (Mobile) -->
+    <div id="pwaInstallPrompt" class="pwa-prompt hidden">
+        <div class="pwa-content">
+            <img src="256.png" alt="Fractonaut Logo">
+            <div class="pwa-text">
+                <h4>Install Fractonaut</h4>
+                <p>Add to Home Screen for the best experience.</p>
+            </div>
+            <button id="pwaInstallBtn">Install</button>
+            <button id="pwaCloseBtn" class="close-icon">×</button>
+        </div>
+    </div>
 
     <script src="script.js"></script>
 </body>
