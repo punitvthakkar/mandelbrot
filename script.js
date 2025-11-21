@@ -662,8 +662,14 @@ function renderCatalogue() {
     container.innerHTML = '';
 
     const currentLocations = locations[state.fractalType] || [];
+    
+    // Load saved locations from localStorage
+    const savedLocations = JSON.parse(localStorage.getItem('fractonaut_saved_locations') || '[]');
+    
+    // Combine predefined and saved locations
+    const allLocations = [...currentLocations, ...savedLocations];
 
-    currentLocations.forEach(loc => {
+    allLocations.forEach(loc => {
         const item = document.createElement('div');
         item.className = 'catalogue-item';
         item.innerHTML = `
@@ -1323,9 +1329,7 @@ const locationNameInput = document.getElementById('locationNameInput');
 const cancelSaveBtn = document.getElementById('cancelSaveBtn');
 const confirmSaveBtn = document.getElementById('confirmSaveBtn');
 
-// Load saved locations
-const savedLocations = JSON.parse(localStorage.getItem('fractonaut_saved_locations') || '[]');
-savedLocations.forEach(loc => locations.push(loc));
+// Load saved locations (they're stored in localStorage and loaded in renderCatalogue)
 renderCatalogue(); // Re-render with saved locations
 
 statsDisplay.addEventListener('click', () => {
@@ -1357,9 +1361,6 @@ confirmSaveBtn.addEventListener('click', () => {
         iterations: state.maxIterations,
         paletteId: state.paletteId
     };
-
-    // Add to locations array
-    locations.push(newLoc);
 
     // Save to local storage
     const currentSaved = JSON.parse(localStorage.getItem('fractonaut_saved_locations') || '[]');
