@@ -794,7 +794,6 @@ canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     const delta = Math.sign(e.deltaY);
     handleZoom(delta, e.clientX, e.clientY);
-    showZoomFocusRing(e.clientX, e.clientY);
 }, { passive: false });
 
 let lastClickTime = 0;
@@ -810,7 +809,6 @@ canvas.addEventListener('click', (e) => {
 
     if (timeDiff < 300 && distance < 10) {
         handleZoom(-1, e.clientX, e.clientY);
-        showZoomFocusRing(e.clientX, e.clientY);
         lastClickTime = 0;
     } else {
         lastClickTime = now;
@@ -818,22 +816,6 @@ canvas.addEventListener('click', (e) => {
     }
 });
 
-function showZoomFocusRing(x, y) {
-    const ring = document.getElementById('zoomFocusRing');
-    ring.style.left = `${x} px`;
-    ring.style.top = `${y} px`;
-    ring.classList.remove('fade-out');
-    ring.classList.add('active');
-
-    setTimeout(() => {
-        ring.classList.remove('active');
-        ring.classList.add('fade-out');
-    }, 400);
-
-    setTimeout(() => {
-        ring.classList.remove('fade-out');
-    }, 800);
-}
 
 canvas.addEventListener('mousedown', (e) => {
     state.isDragging = true;
