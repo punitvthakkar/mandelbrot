@@ -145,6 +145,7 @@ canvas {
     z-index: 0;
     filter: contrast(1.05) saturate(1.12);
     transition: filter var(--transition-normal);
+    touch-action: none;
 }
 
 canvas:active {
@@ -1534,10 +1535,14 @@ input[type=range]::-webkit-slider-thumb:hover {
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
 }
 
-.pwa-prompt.hidden {
-    transform: translateX(-50%) translateY(100px);
-    opacity: 0;
-    pointer-events: none;
+transform: translateX(-50%) translateY(100px);
+opacity: 0;
+pointer-events: none;
+display: none;
+}
+
+.pwa-prompt:not(.hidden) {
+    display: block;
 }
 
 .pwa-content {

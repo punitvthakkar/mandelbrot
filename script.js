@@ -1225,6 +1225,7 @@ window.addEventListener('resize', () => {
 // updateLocationInfo('default'); removed
 
 // --- PWA Install Logic ---
+// --- PWA Install Logic ---
 let deferredPrompt;
 const pwaPrompt = document.getElementById('pwaInstallPrompt');
 const installBtn = document.getElementById('pwaInstallBtn');
@@ -1235,25 +1236,40 @@ window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     // Stash the event so it can be triggered later.
     deferredPrompt = e;
+    console.log('beforeinstallprompt fired');
 
     // Show prompt only on mobile/tablet widths
     if (window.innerWidth < 768) {
-        setTimeout(() => {
-            pwaPrompt.classList.remove('hidden');
-        }, 3000);
+        // Show the custom install prompt
+        pwaPrompt.classList.remove('hidden');
     }
 });
 
 installBtn.addEventListener('click', async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+        console.log('No deferred prompt available');
+        return;
+    }
+    // Show the install prompt
     deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to the install prompt: ${outcome}`);
+    // We've used the prompt, and can't use it again, throw it away
     deferredPrompt = null;
+    // Hide our custom UI
     pwaPrompt.classList.add('hidden');
 });
 
 closePwaBtn.addEventListener('click', () => {
     pwaPrompt.classList.add('hidden');
+});
+
+window.addEventListener('appinstalled', () => {
+    // Hide the app-provided install promotion
+    pwaPrompt.classList.add('hidden');
+    deferredPrompt = null;
+    console.log('PWA was installed');
 });
 
 // --- HUD & Save Location Logic ---
