@@ -1707,7 +1707,8 @@ const closePwaBtn = document.getElementById('pwaCloseBtn');
 function isAppInstalled() {
     return window.matchMedia('(display-mode: standalone)').matches ||
         window.navigator.standalone === true ||
-        document.referrer.includes('android-app://');
+        document.referrer.includes('android-app://') ||
+        localStorage.getItem('pwa_installed') === 'true';
 }
 
 // Check if prompt was dismissed
@@ -1719,6 +1720,13 @@ function wasPromptDismissed() {
 function dismissPrompt() {
     localStorage.setItem('pwa_prompt_dismissed', 'true');
     pwaPrompt.classList.add('hidden');
+}
+
+// Mark app as installed
+function markAppInstalled() {
+    localStorage.setItem('pwa_installed', 'true');
+    pwaPrompt.classList.add('hidden');
+    deferredPrompt = null;
 }
 
 // Check if we should show the prompt
@@ -1756,7 +1764,7 @@ installBtn.addEventListener('click', async () => {
         console.log('No deferred prompt available');
         return;
     }
-    // Show the install prompt
+    // Show the install prompt (happens in background)
     deferredPrompt.prompt();
     // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
@@ -1765,9 +1773,12 @@ installBtn.addEventListener('click', async () => {
     deferredPrompt = null;
     // Hide our custom UI
     pwaPrompt.classList.add('hidden');
-    // Mark as dismissed if user declined
+    // Mark as dismissed if user declined, or mark as installed if accepted
     if (outcome === 'dismissed') {
         dismissPrompt();
+    } else if (outcome === 'accepted') {
+        // User accepted, app will be installed - mark it
+        markAppInstalled();
     }
 });
 
@@ -1779,12 +1790,13 @@ window.addEventListener('appinstalled', () => {
     // Hide the app-provided install promotion
     pwaPrompt.classList.add('hidden');
     deferredPrompt = null;
-    // Mark as dismissed since app is now installed
-    dismissPrompt();
+    // Mark as installed so prompt never shows again
+    markAppInstalled();
     console.log('PWA was installed');
 });
 
 // Check on load if we should hide the prompt
+// Only show if not installed and not dismissed
 if (isAppInstalled() || wasPromptDismissed()) {
     pwaPrompt.classList.add('hidden');
 }
@@ -1860,3 +1872,49 @@ fractalCards.forEach(card => {
 
 // Start rendering
 requestAnimationFrame(drawScene);
+
+// --- Service Worker Registration (PWA Update Check) ---
+if ('serviceWorker' in navigator) {
+    // Register service worker and check for updates on every launch
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+            .then((registration) => {
+                console.log('Service Worker registered');
+
+                // Check for updates on every launch
+                registration.update();
+
+                // Listen for updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    if (newWorker) {
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // New service worker available, reload to get fresh content
+                                if (navigator.onLine) {
+                                    window.location.reload();
+                                }
+                            }
+                        });
+                    }
+                });
+
+                // Check for updates periodically (every 5 minutes)
+                setInterval(() => {
+                    if (navigator.onLine) {
+                        registration.update();
+                    }
+                }, 5 * 60 * 1000);
+            })
+            .catch((error) => {
+                console.log('Service Worker registration failed:', error);
+            });
+
+        // Handle controller change (when new service worker takes control)
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (navigator.onLine) {
+                window.location.reload();
+            }
+        });
+    });
+}
