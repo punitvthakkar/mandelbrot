@@ -708,11 +708,11 @@ function renderCatalogue() {
 
 function startHypnoticJourney(loc) {
     const durationInput = document.getElementById('journeyDuration');
-    const duration = parseFloat(durationInput.value) || 10;
+    const duration = loc.duration || parseFloat(durationInput.value) || 10;
 
-    // 1. Reset to Home Zoom but Target Location
+    // 1. Reset to Home Zoom but Target Location (z = 1x means zoom level 3.0)
     state.zoomCenter = { x: loc.x, y: loc.y };
-    state.zoomSize = 3.0;
+    state.zoomSize = 3.0; // z = 1x
     state.targetZoomCenter = { x: loc.x, y: loc.y };
     state.targetZoomSize = 3.0;
 
@@ -727,10 +727,18 @@ function startHypnoticJourney(loc) {
     const paletteBtn = document.querySelector(`.palette-card[data-palette="${loc.paletteId}"]`);
     if (paletteBtn) paletteBtn.classList.add('active');
 
-    // 3. Animate Zoom Only
+    // 3. Fade transition
+    const canvas = document.getElementById('glCanvas');
+    canvas.classList.remove('canvas-fade', 'fade-in');
+    canvas.classList.add('canvas-fade');
+    setTimeout(() => {
+        canvas.classList.add('fade-in');
+    }, 50);
+
+    // 4. Animate Zoom Only
     state.isAnimating = true;
     const startTime = Date.now();
-    const startSize = 3.0;
+    const startSize = 3.0; // Start from z = 1x
     const targetSize = 3.0 / (loc.zoom || 1.0);
 
     function animate() {
@@ -759,14 +767,75 @@ function startHypnoticJourney(loc) {
             requestAnimationFrame(animate);
         } else {
             state.isAnimating = false;
+            // Show share button popup after flythrough completes
+            showShareButtonPopup(loc);
         }
     }
 
     animate();
 
     // Close panel on all devices
-    document.getElementById('controlPanel').classList.remove('visible');
-    document.getElementById('controlToggle').classList.remove('hidden'); // Ensure toggle comes back
+    const panel = document.getElementById('controlPanel');
+    if (panel) panel.classList.remove('visible');
+    const toggle = document.getElementById('controlToggle');
+    if (toggle) toggle.classList.remove('hidden');
+}
+
+function showShareButtonPopup(loc) {
+    const popup = document.getElementById('shareButtonPopup');
+    const shareBtn = document.getElementById('shareLocationBtn');
+    
+    // Generate share URL
+    const zoom = loc.zoom || (3.0 / state.zoomSize);
+    const params = new URLSearchParams({
+        x: loc.x.toFixed(6),
+        y: loc.y.toFixed(6),
+        z: zoom.toFixed(2),
+        i: loc.iterations,
+        p: loc.paletteId,
+        f: state.fractalType,
+        n: loc.title,
+        d: loc.duration || 30
+    });
+    const shareUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+
+    // Clear any existing handlers
+    shareBtn.onclick = null;
+
+    // Show popup
+    setTimeout(() => {
+        popup.classList.add('show');
+    }, 500);
+
+    // Handle share button click
+    shareBtn.onclick = () => {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            showToast('Link copied to clipboard!');
+            popup.classList.remove('show');
+        }).catch(() => {
+            // Fallback: try Web Share API
+            if (navigator.share) {
+                navigator.share({
+                    title: loc.title,
+                    text: `Check out this fractal location: ${loc.title}`,
+                    url: shareUrl
+                }).then(() => {
+                    popup.classList.remove('show');
+                }).catch(() => {
+                    showToast('Could not share');
+                });
+            } else {
+                showToast('Could not copy link');
+            }
+        });
+    };
+
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+        if (popup.classList.contains('show')) {
+            popup.classList.remove('show');
+        }
+    }, 10000);
 }
 
 // Initialize Catalogue
@@ -936,12 +1005,31 @@ function toggleControlPanel() {
 function initSaveSystem() {
     const trigger = document.getElementById('statusTrigger');
     const modal = document.getElementById('saveModal');
+    const nameInput = document.getElementById('locationNameInput');
+    const durationInput = document.getElementById('locationDurationInput');
     const cancelBtn = document.getElementById('cancelSaveBtn');
     const confirmBtn = document.getElementById('confirmSaveBtn');
 
     if (trigger) {
         trigger.addEventListener('click', () => {
+            // Calculate suggested duration based on current zoom
+            const currentZoom = 3.0 / state.zoomSize;
+            const suggestedDuration = calculateDurationFromZoom(currentZoom);
+            durationInput.value = suggestedDuration;
+
+            // Set random name suggestion
+            const randomName = nameSuggestions[Math.floor(Math.random() * nameSuggestions.length)];
+            nameInput.value = randomName;
+            nameInput.placeholder = randomName;
+
+            // Show modal
             modal.classList.remove('hidden');
+            
+            // Focus on name input and open keyboard (mobile)
+            setTimeout(() => {
+                nameInput.focus();
+                nameInput.select();
+            }, 100);
         });
     }
 
@@ -953,26 +1041,136 @@ function initSaveSystem() {
 
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
-            const name = document.getElementById('locationNameInput').value || 'Untitled Scene';
-            const duration = document.getElementById('locationDurationInput').value || 30;
+            const name = nameInput.value.trim() || nameInput.placeholder || 'Untitled Scene';
+            const duration = parseFloat(durationInput.value) || 30;
             saveScene(name, duration);
-            modal.classList.add('hidden');
         });
     }
 
     // Check URL Params on Load
     const params = new URLSearchParams(window.location.search);
     if (params.has('x') && params.has('y') && params.has('z')) {
-        state.zoomCenter.x = parseFloat(params.get('x'));
-        state.zoomCenter.y = parseFloat(params.get('y'));
-        state.zoomSize = 3.0 / parseFloat(params.get('z'));
-        state.maxIterations = parseInt(params.get('i')) || 500;
-        state.paletteId = parseInt(params.get('p')) || 0;
-        state.fractalType = parseInt(params.get('f')) || 0;
-
-        state.targetZoomCenter = { ...state.zoomCenter };
-        state.targetZoomSize = state.zoomSize;
+        // Show popup to add shared location
+        showAddLocationModal(params);
     }
+}
+
+function showAddLocationModal(params) {
+    const modal = document.getElementById('addLocationModal');
+    const messageEl = document.getElementById('addLocationMessage');
+    const cancelBtn = document.getElementById('cancelAddLocationBtn');
+    const confirmBtn = document.getElementById('confirmAddLocationBtn');
+
+    // Extract location data from URL
+    const locationData = {
+        x: parseFloat(params.get('x')),
+        y: parseFloat(params.get('y')),
+        z: parseFloat(params.get('z')),
+        zoom: parseFloat(params.get('z')),
+        iterations: parseInt(params.get('i')) || 500,
+        paletteId: parseInt(params.get('p')) || 0,
+        fractalType: parseInt(params.get('f')) || 0,
+        name: params.get('n') || 'Shared Location',
+        duration: parseInt(params.get('d')) || 30
+    };
+
+    // Show modal
+    modal.classList.remove('hidden');
+
+    // Handle cancel
+    cancelBtn.onclick = () => {
+        modal.classList.add('hidden');
+        // Clear URL params to prevent showing again on refresh
+        window.history.replaceState({}, document.title, window.location.pathname);
+    };
+
+    // Handle confirm
+    confirmBtn.onclick = () => {
+        modal.classList.add('hidden');
+        
+        // Save location to localStorage
+        const newLoc = {
+            id: Date.now().toString(),
+            title: locationData.name,
+            description: `Duration: ${locationData.duration}s`,
+            x: locationData.x,
+            y: locationData.y,
+            zoom: locationData.zoom,
+            iterations: locationData.iterations,
+            paletteId: locationData.paletteId,
+            duration: locationData.duration
+        };
+
+        const saved = JSON.parse(localStorage.getItem('fractonaut_saved_locations') || '[]');
+        saved.push(newLoc);
+        localStorage.setItem('fractonaut_saved_locations', JSON.stringify(saved));
+
+        // Set fractal type
+        state.fractalType = locationData.fractalType;
+
+        // Refresh catalogue
+        renderCatalogue();
+
+        // Set duration for flythrough
+        const durationInput = document.getElementById('journeyDuration');
+        if (durationInput) {
+            durationInput.value = locationData.duration;
+        }
+
+        // Start flythrough from (x, y, z=0) which means zoom level 3.0
+        startHypnoticJourney(newLoc);
+
+        // Clear URL params
+        window.history.replaceState({}, document.title, window.location.pathname);
+    };
+}
+
+// Name suggestions list
+const nameSuggestions = [
+    'The Elephant Saw Me',
+    'The Three Arms',
+    'Cosmic Spiral',
+    'Rising Up',
+    'Hello Jellyfish',
+    'The Golden Valley',
+    'Infinite Depths',
+    'Stellar Whirlpool',
+    'The Crystal Garden',
+    'Nebula Dreams',
+    'The Spiral Heart',
+    'Cosmic Tendrils',
+    'The Void\'s Edge',
+    'Stardust Cascade',
+    'The Fractal Crown',
+    'Eternal Spiral',
+    'The Deep Abyss',
+    'Celestial Dance',
+    'The Hidden Realm',
+    'Mystic Vortex'
+];
+
+function calculateDurationFromZoom(zoom) {
+    // Base duration: 10 seconds
+    // Max duration: 45 seconds
+    // Scale proportionally with zoom (logarithmic for smoothness)
+    const minZoom = 1.0;
+    const maxZoom = 10000.0; // Reasonable max zoom
+    const logZoom = Math.log10(Math.max(minZoom, Math.min(maxZoom, zoom)));
+    const logMin = Math.log10(minZoom);
+    const logMax = Math.log10(maxZoom);
+    const normalized = (logZoom - logMin) / (logMax - logMin);
+    const duration = 10 + (normalized * 35); // 10 to 45 range
+    return Math.round(duration);
+}
+
+function showToast(message) {
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toastMessage');
+    toastMessage.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 3000);
 }
 
 function saveScene(name, duration) {
@@ -984,7 +1182,9 @@ function saveScene(name, duration) {
         z: zoom.toFixed(2),
         i: state.maxIterations,
         p: state.paletteId,
-        f: state.fractalType
+        f: state.fractalType,
+        n: name,
+        d: duration
     });
     const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
 
@@ -1010,10 +1210,19 @@ function saveScene(name, duration) {
 
     // 4. Copy URL to Clipboard (Feedback)
     navigator.clipboard.writeText(url).then(() => {
-        alert('Scene saved & URL copied to clipboard!');
+        showToast('URL copied to clipboard!');
     }).catch(() => {
-        alert('Scene saved! (Could not copy URL)');
+        showToast('Scene saved!');
     });
+
+    // 5. Close modal and start flythrough
+    const modal = document.getElementById('saveModal');
+    modal.classList.add('hidden');
+
+    // 6. Fade transition and start flythrough
+    setTimeout(() => {
+        startHypnoticJourney(newLoc);
+    }, 300);
 }
 
 // Initialize

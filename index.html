@@ -31,21 +31,19 @@
     <canvas id="glCanvas"></canvas>
     <div class="canvas-vignette"></div>
 
-    <!-- Top Right Status & Save Trigger -->
-    <div class="status-container" id="statusTrigger">
-        <div class="status-row">
-            <span class="status-label">X</span>
-            <span class="status-value" id="coordX">0.000000</span>
-        </div>
-        <div class="status-row">
-            <span class="status-label">Y</span>
-            <span class="status-value" id="coordY">0.000000</span>
-        </div>
-        <div class="status-row">
-            <span class="status-label">Z</span>
-            <span class="status-value" id="coordZ">1.0</span>
-        </div>
-        <div class="status-hint">TAP TO SAVE</div>
+    <!-- Plus Button Save Trigger -->
+    <button class="plus-button" id="statusTrigger" aria-label="Save location">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+    </button>
+
+    <!-- Hidden stats for internal use -->
+    <div style="display: none;">
+        <span id="coordX">0.000000</span>
+        <span id="coordY">0.000000</span>
+        <span id="coordZ">1.0</span>
     </div>
 
     <!-- Central Circle Control -->
@@ -258,12 +256,11 @@
 
     <!-- Save Location Modal -->
     <div id="saveModal" class="modal hidden">
-        <div class="modal-content">
+        <div class="modal-content save-modal-content">
             <h3>Save Scene</h3>
-            <p>Name your discovery and set a journey duration.</p>
             <div class="input-group">
                 <label>Name</label>
-                <input type="text" id="locationNameInput" placeholder="e.g., Cosmic Spiral" maxlength="30">
+                <input type="text" id="locationNameInput" placeholder="Enter name..." maxlength="30" autofocus>
             </div>
             <div class="input-group">
                 <label>Duration (seconds)</label>
@@ -272,6 +269,35 @@
             <div class="modal-actions">
                 <button id="cancelSaveBtn" class="btn-secondary">Cancel</button>
                 <button id="confirmSaveBtn" class="btn-primary">Save & Fly</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Button Popup (shown after flythrough) -->
+    <div id="shareButtonPopup" class="share-popup hidden">
+        <button id="shareLocationBtn" class="share-btn-large">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                <polyline points="16 6 12 2 8 6"></polyline>
+                <line x1="12" y1="2" x2="12" y2="15"></line>
+            </svg>
+            <span>Share Location</span>
+        </button>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">
+        <span id="toastMessage">URL copied to clipboard!</span>
+    </div>
+
+    <!-- Add Shared Location Modal -->
+    <div id="addLocationModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Shared Location</h3>
+            <p id="addLocationMessage">Do you want to add this location?</p>
+            <div class="modal-actions">
+                <button id="cancelAddLocationBtn" class="btn-secondary">No</button>
+                <button id="confirmAddLocationBtn" class="btn-primary">Yes</button>
             </div>
         </div>
     </div>
