@@ -785,6 +785,10 @@ function getShareText(locationName, shareUrl) {
     return `Let's go on a trip to ${locationName} on Fractonaut\n\n${shareUrl}`;
 }
 
+function getShareTextWithoutUrl(locationName) {
+    return `Let's go on a trip to ${locationName} on Fractonaut`;
+}
+
 function shareLocation(loc) {
     const zoom = loc.zoom || (3.0 / state.zoomSize);
     const params = new URLSearchParams({
@@ -799,12 +803,13 @@ function shareLocation(loc) {
     });
     const shareUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
     const shareText = getShareText(loc.title, shareUrl);
+    const shareTextWithoutUrl = getShareTextWithoutUrl(loc.title);
 
     // Try Web Share API first (mobile)
     if (navigator.share) {
         navigator.share({
             title: loc.title,
-            text: shareText,
+            text: shareTextWithoutUrl,
             url: shareUrl
         }).catch(() => {
             // Fallback to clipboard
@@ -949,6 +954,7 @@ function showShareButtonPopup(loc) {
     });
     const shareUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
     const shareText = getShareText(loc.title, shareUrl);
+    const shareTextWithoutUrl = getShareTextWithoutUrl(loc.title);
     const screenCtx = getScreenContext();
 
     // Clear any existing handlers
@@ -965,7 +971,7 @@ function showShareButtonPopup(loc) {
         if (screenCtx.isMobile && navigator.share) {
             navigator.share({
                 title: loc.title,
-                text: shareText,
+                text: shareTextWithoutUrl,
                 url: shareUrl
             }).then(() => {
                 popup.classList.remove('show');
@@ -1659,35 +1665,44 @@ document.querySelectorAll('.palette-card').forEach(btn => {
 
 // Removed obsolete locationSelect listener
 
+// Reset function (shared by both reset buttons)
+function resetView() {
+    state.velocity = { x: 0, y: 0 };
+    state.maxIterations = 500;
+    state.paletteId = 0;
+
+    if (state.fractalType === 2) { // Sierpinski
+        state.targetZoomCenter = { x: 0.5, y: 0.288 };
+        state.targetZoomSize = 1.5;
+        state.maxIterations = 200;
+    } else if (state.fractalType === 1) { // Julia
+        state.targetZoomCenter = { x: 0.0, y: 0.0 };
+        state.targetZoomSize = 3.0;
+    } else { // Mandelbrot
+        state.targetZoomCenter = { x: -0.75, y: 0.0 };
+        state.targetZoomSize = 3.0;
+    }
+
+    state.zoomCenter = { ...state.targetZoomCenter };
+    state.zoomSize = state.targetZoomSize;
+
+    // Reset UI controls
+    document.getElementById('iterations').value = state.maxIterations;
+    document.getElementById('iterValue').innerText = state.maxIterations;
+    document.querySelectorAll('.palette-card').forEach(c => c.classList.remove('active'));
+    document.querySelector('.palette-card[data-palette="0"]').classList.add('active');
+}
+
 // Quick Actions
 const resetBtn = document.getElementById('resetBtn');
 if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-        state.velocity = { x: 0, y: 0 };
-        state.maxIterations = 500;
-        state.paletteId = 0;
+    resetBtn.addEventListener('click', resetView);
+}
 
-        if (state.fractalType === 2) { // Sierpinski
-            state.targetZoomCenter = { x: 0.5, y: 0.288 };
-            state.targetZoomSize = 1.5;
-            state.maxIterations = 200;
-        } else if (state.fractalType === 1) { // Julia
-            state.targetZoomCenter = { x: 0.0, y: 0.0 };
-            state.targetZoomSize = 3.0;
-        } else { // Mandelbrot
-            state.targetZoomCenter = { x: -0.75, y: 0.0 };
-            state.targetZoomSize = 3.0;
-        }
-
-        state.zoomCenter = { ...state.targetZoomCenter };
-        state.zoomSize = state.targetZoomSize;
-
-        // Reset UI controls
-        document.getElementById('iterations').value = state.maxIterations;
-        document.getElementById('iterValue').innerText = state.maxIterations;
-        document.querySelectorAll('.palette-card').forEach(c => c.classList.remove('active'));
-        document.querySelector('.palette-card[data-palette="0"]').classList.add('active');
-    });
+// Joystick side reset button
+const resetButton = document.getElementById('resetButton');
+if (resetButton) {
+    resetButton.addEventListener('click', resetView);
 }
 
 const screenshotBtn = document.getElementById('screenshotBtn');
