@@ -608,6 +608,19 @@ function drawScene(timestamp) {
     const lerpFactor = 1.0 - Math.pow(0.1, deltaTime * 10);
 
     if (!state.isAnimating) {
+        // Apply smooth zoom limit at 0.5x (zoomSize = 6.0)
+        const maxZoomSize = 6.0;
+        if (state.targetZoomSize > maxZoomSize) {
+            // Smooth resistance with subtle bounce effect
+            const excess = state.targetZoomSize - maxZoomSize;
+            const resistance = 1.0 / (1.0 + excess * 0.5);
+            state.targetZoomSize = maxZoomSize + excess * resistance;
+            
+            // Snap center to (0.75, 0) when at limit for smooth experience
+            state.targetZoomCenter.x = 0.75;
+            state.targetZoomCenter.y = 0.0;
+        }
+        
         state.zoomSize += (state.targetZoomSize - state.zoomSize) * lerpFactor;
         state.zoomCenter.x += (state.targetZoomCenter.x - state.zoomCenter.x) * lerpFactor;
         state.zoomCenter.y += (state.targetZoomCenter.y - state.zoomCenter.y) * lerpFactor;
@@ -693,17 +706,112 @@ function renderCatalogue() {
     allLocations.forEach(loc => {
         const item = document.createElement('div');
         item.className = 'catalogue-item';
+        
+        // Check if this is a saved location (has an id that's a timestamp string)
+        const isSavedLocation = savedLocations.some(saved => saved.id === loc.id);
+        
         item.innerHTML = `
-    <h4 > ${loc.title}</h4>
-            <p>${loc.description}</p>
-            <div class="meta">
-                <span>Zoom: ${loc.zoom}x</span>
-                <span>Iter: ${loc.iterations}</span>
+            <div class="catalogue-item-content">
+                <h4>${loc.title}</h4>
+                <p>${loc.description}</p>
+                <div class="meta">
+                    <span>Zoom: ${loc.zoom}x</span>
+                    <span>Iter: ${loc.iterations}</span>
+                </div>
             </div>
-`;
-        item.onclick = () => startHypnoticJourney(loc);
+            ${isSavedLocation ? `
+                <div class="catalogue-item-actions" onclick="event.stopPropagation()">
+                    <button class="catalogue-action-btn share-btn" data-loc-id="${loc.id}" title="Share">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                            <polyline points="16 6 12 2 8 6"></polyline>
+                            <line x1="12" y1="2" x2="12" y2="15"></line>
+                        </svg>
+                    </button>
+                    <button class="catalogue-action-btn delete-btn" data-loc-id="${loc.id}" title="Delete">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            ` : ''}
+        `;
+        
+        // Main click to start journey
+        const contentDiv = item.querySelector('.catalogue-item-content');
+        if (contentDiv) {
+            contentDiv.onclick = () => startHypnoticJourney(loc);
+        }
+        
+        // Share button handler
+        const shareBtn = item.querySelector('.share-btn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                shareLocation(loc);
+            });
+        }
+        
+        // Delete button handler
+        const deleteBtn = item.querySelector('.delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteLocation(loc.id);
+            });
+        }
+        
         container.appendChild(item);
     });
+}
+
+function shareLocation(loc) {
+    const zoom = loc.zoom || (3.0 / state.zoomSize);
+    const params = new URLSearchParams({
+        x: loc.x.toFixed(6),
+        y: loc.y.toFixed(6),
+        z: zoom.toFixed(2),
+        i: loc.iterations,
+        p: loc.paletteId,
+        f: state.fractalType,
+        n: loc.title,
+        d: loc.duration || 30
+    });
+    const shareUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+
+    // Try Web Share API first (mobile)
+    if (navigator.share) {
+        navigator.share({
+            title: loc.title,
+            text: `Check out this fractal location: ${loc.title}`,
+            url: shareUrl
+        }).catch(() => {
+            // Fallback to clipboard
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                showToast('Link copied to clipboard!');
+            }).catch(() => {
+                showToast('Could not share');
+            });
+        });
+    } else {
+        // Fallback to clipboard
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            showToast('Link copied to clipboard!');
+        }).catch(() => {
+            showToast('Could not copy link');
+        });
+    }
+}
+
+function deleteLocation(locId) {
+    if (confirm('Are you sure you want to delete this location?')) {
+        const saved = JSON.parse(localStorage.getItem('fractonaut_saved_locations') || '[]');
+        const filtered = saved.filter(loc => loc.id !== locId);
+        localStorage.setItem('fractonaut_saved_locations', JSON.stringify(filtered));
+        renderCatalogue();
+        showToast('Location deleted');
+    }
 }
 
 function startHypnoticJourney(loc) {
@@ -875,8 +983,22 @@ function handleZoom(delta, x, y) {
         state.targetZoomSize /= zoomFactor;
     }
 
-    state.targetZoomCenter.x = wx - uvx * state.targetZoomSize;
-    state.targetZoomCenter.y = wy - uvy * state.targetZoomSize;
+    // Apply smooth zoom limit at 0.5x (zoomSize = 6.0)
+    const maxZoomSize = 6.0;
+    if (state.targetZoomSize > maxZoomSize) {
+        // Smooth resistance with subtle bounce
+        const excess = state.targetZoomSize - maxZoomSize;
+        const resistance = 1.0 / (1.0 + excess * 0.5);
+        state.targetZoomSize = maxZoomSize + excess * resistance;
+        
+        // Snap center to (0.75, 0) when at limit
+        state.targetZoomCenter.x = 0.75;
+        state.targetZoomCenter.y = 0.0;
+    } else {
+        // Normal zoom behavior when not at limit
+        state.targetZoomCenter.x = wx - uvx * state.targetZoomSize;
+        state.targetZoomCenter.y = wy - uvy * state.targetZoomSize;
+    }
 }
 
 // Mouse/Touch Interactions
@@ -1057,7 +1179,7 @@ function initSaveSystem() {
 
 function showAddLocationModal(params) {
     const modal = document.getElementById('addLocationModal');
-    const messageEl = document.getElementById('addLocationMessage');
+    const titleEl = document.getElementById('addLocationTitle');
     const cancelBtn = document.getElementById('cancelAddLocationBtn');
     const confirmBtn = document.getElementById('confirmAddLocationBtn');
 
@@ -1070,9 +1192,12 @@ function showAddLocationModal(params) {
         iterations: parseInt(params.get('i')) || 500,
         paletteId: parseInt(params.get('p')) || 0,
         fractalType: parseInt(params.get('f')) || 0,
-        name: params.get('n') || 'Shared Location',
+        name: params.get('n') || 'this location',
         duration: parseInt(params.get('d')) || 30
     };
+
+    // Update title with location name
+    titleEl.textContent = `Start the trip to ${locationData.name}?`;
 
     // Show modal
     modal.classList.remove('hidden');
@@ -1117,7 +1242,7 @@ function showAddLocationModal(params) {
             durationInput.value = locationData.duration;
         }
 
-        // Start flythrough from (x, y, z=0) which means zoom level 3.0
+        // Start trip (flythrough) from (x, y, z=1x) which means zoom level 3.0
         startHypnoticJourney(newLoc);
 
         // Clear URL params
@@ -1208,11 +1333,9 @@ function saveScene(name, duration) {
     // 3. Refresh Catalogue
     renderCatalogue();
 
-    // 4. Copy URL to Clipboard (Feedback)
-    navigator.clipboard.writeText(url).then(() => {
-        showToast('URL copied to clipboard!');
-    }).catch(() => {
-        showToast('Scene saved!');
+    // 4. Copy URL to Clipboard (silently, no toast)
+    navigator.clipboard.writeText(url).catch(() => {
+        // Silently fail if clipboard access is not available
     });
 
     // 5. Close modal and start flythrough
@@ -1337,8 +1460,22 @@ canvas.addEventListener('touchmove', (e) => {
                 state.targetZoomSize /= (1 - delta * zoomStrength);
             }
 
-            state.targetZoomCenter.x = wx - uvx * state.targetZoomSize;
-            state.targetZoomCenter.y = wy - uvy * state.targetZoomSize;
+            // Apply smooth zoom limit at 0.5x (zoomSize = 6.0)
+            const maxZoomSize = 6.0;
+            if (state.targetZoomSize > maxZoomSize) {
+                // Smooth resistance with subtle bounce
+                const excess = state.targetZoomSize - maxZoomSize;
+                const resistance = 1.0 / (1.0 + excess * 0.5);
+                state.targetZoomSize = maxZoomSize + excess * resistance;
+                
+                // Snap center to (0.75, 0) when at limit
+                state.targetZoomCenter.x = 0.75;
+                state.targetZoomCenter.y = 0.0;
+            } else {
+                // Normal zoom behavior when not at limit
+                state.targetZoomCenter.x = wx - uvx * state.targetZoomSize;
+                state.targetZoomCenter.y = wy - uvy * state.targetZoomSize;
+            }
         }
         lastTouchDistance = distance;
     }

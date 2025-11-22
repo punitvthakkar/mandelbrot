@@ -1255,8 +1255,9 @@ canvas:active {
     cursor: pointer;
     transition: all var(--transition-normal);
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-sm);
     text-align: left;
 }
 
@@ -1266,19 +1267,74 @@ canvas:active {
     border-color: var(--accent-primary);
 }
 
-.catalogue-item h4 {
+.catalogue-item-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.catalogue-item-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.catalogue-action-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+    padding: 0;
+}
+
+.catalogue-action-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9);
+    transform: scale(1.1);
+}
+
+.catalogue-action-btn.delete-btn:hover {
+    background: rgba(255, 0, 0, 0.2);
+    border-color: rgba(255, 0, 0, 0.4);
+    color: #ff6b6b;
+}
+
+.catalogue-action-btn.share-btn:hover {
+    background: rgba(0, 255, 255, 0.1);
+    border-color: rgba(0, 255, 255, 0.3);
+    color: #00ffff;
+}
+
+.catalogue-action-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.catalogue-item-content h4 {
     font-size: 0.9rem;
     font-weight: 600;
     color: var(--text-primary);
+    margin: 0;
 }
 
-.catalogue-item p {
+.catalogue-item-content p {
     font-size: 0.75rem;
     color: var(--text-secondary);
     line-height: 1.4;
+    margin: 0;
 }
 
-.catalogue-item .meta {
+.catalogue-item-content .meta {
     display: flex;
     gap: var(--spacing-md);
     margin-top: var(--spacing-xs);
