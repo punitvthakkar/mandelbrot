@@ -306,7 +306,9 @@ let state = {
     fidgetZoomVelocity: 0,
     fractalType: 0, // 0: Mandelbrot, 1: Julia, 2: Sierpinski
     juliaC: { x: -0.7269, y: 0.1889 },
-    circleDrag: { active: false, startX: 0, startY: 0, startIter: 0 }
+    circleDrag: { active: false, startX: 0, startY: 0, startIter: 0 },
+    pendingInteraction: null, // For RAF-throttled interactions
+    interactionRAF: null // Track RAF ID for interactions
 };
 
 const locations = {
@@ -582,56 +584,61 @@ gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
 let lastTime = 0;
 
-// Rendering
+// Rendering - Optimized for smoothness
 function drawScene(timestamp) {
     if (!lastTime) lastTime = timestamp;
     const deltaTime = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
 
+    // Velocity physics - only when not dragging or animating
     if (!state.isDragging && !state.isAnimating) {
-        state.targetZoomCenter.x -= state.velocity.x * deltaTime * 60;
-        state.targetZoomCenter.y -= state.velocity.y * deltaTime * 60;
+        const dt60 = deltaTime * 60;
+        state.targetZoomCenter.x -= state.velocity.x * dt60;
+        state.targetZoomCenter.y -= state.velocity.y * dt60;
 
-        state.velocity.x *= Math.pow(state.friction, deltaTime * 60);
-        state.velocity.y *= Math.pow(state.friction, deltaTime * 60);
+        const frictionPow = Math.pow(state.friction, dt60);
+        state.velocity.x *= frictionPow;
+        state.velocity.y *= frictionPow;
 
+        // Early zero-out for better performance
         if (Math.abs(state.velocity.x) < 1e-9 && Math.abs(state.velocity.y) < 1e-9) {
-            state.velocity = { x: 0, y: 0 };
+            state.velocity.x = 0;
+            state.velocity.y = 0;
         }
     }
 
     // Handle Fidget Zoom
-    if (state.fidgetZoomVelocity && state.fidgetZoomVelocity !== 0) {
+    if (state.fidgetZoomVelocity !== 0) {
         handleZoom(state.fidgetZoomVelocity);
     }
 
-    const lerpFactor = 1.0 - Math.pow(0.1, deltaTime * 10);
-
+    // Smooth interpolation
     if (!state.isAnimating) {
+        const lerpFactor = 1.0 - Math.pow(0.1, deltaTime * 10);
+        
         // Apply smooth zoom limit at 0.5x (zoomSize = 6.0)
-        // Only apply limit if not just finishing an animation (avoid jarring transitions)
         const maxZoomSize = 6.0;
         if (state.targetZoomSize > maxZoomSize) {
-            // Smooth resistance with subtle bounce effect
             const excess = state.targetZoomSize - maxZoomSize;
             const resistance = 1.0 / (1.0 + excess * 0.5);
             state.targetZoomSize = maxZoomSize + excess * resistance;
-            
-            // Snap center to (0.75, 0) when at limit for smooth experience
             state.targetZoomCenter.x = 0.75;
             state.targetZoomCenter.y = 0.0;
         }
         
-        // Smooth interpolation to target values
-        state.zoomSize += (state.targetZoomSize - state.zoomSize) * lerpFactor;
-        state.zoomCenter.x += (state.targetZoomCenter.x - state.zoomCenter.x) * lerpFactor;
-        state.zoomCenter.y += (state.targetZoomCenter.y - state.zoomCenter.y) * lerpFactor;
+        // Single lerp calculation for all axes
+        const diffSize = state.targetZoomSize - state.zoomSize;
+        const diffX = state.targetZoomCenter.x - state.zoomCenter.x;
+        const diffY = state.targetZoomCenter.y - state.zoomCenter.y;
+        
+        state.zoomSize += diffSize * lerpFactor;
+        state.zoomCenter.x += diffX * lerpFactor;
+        state.zoomCenter.y += diffY * lerpFactor;
     } else {
-        // During animation, ensure zoomSize stays in sync with targetZoomSize
-        // This prevents any drift or conflicts between animation and drawScene
         state.zoomSize = state.targetZoomSize;
     }
 
+    // Minimal canvas resize check
     resizeCanvasToDisplaySize(gl.canvas);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
@@ -640,10 +647,12 @@ function drawScene(timestamp) {
 
     gl.useProgram(programInfo.program);
 
+    // Vertex setup (no change needed each frame, but kept for compatibility)
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 2, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
 
+    // Set uniforms
     gl.uniform2f(programInfo.uniformLocations.resolution, gl.canvas.width, gl.canvas.height);
 
     const centerXSplit = splitDouble(state.zoomCenter.x);
@@ -659,7 +668,7 @@ function drawScene(timestamp) {
     gl.uniform1i(programInfo.uniformLocations.fractalType, state.fractalType);
     gl.uniform2f(programInfo.uniformLocations.juliaC, state.juliaC.x, state.juliaC.y);
 
-    const highPrecision = state.zoomSize < 0.001 && state.fractalType < 2; // Only Mandelbrot/Julia use high precision logic
+    const highPrecision = state.zoomSize < 0.001 && state.fractalType < 2;
     gl.uniform1i(programInfo.uniformLocations.highPrecision, highPrecision ? 1 : 0);
 
     gl.activeTexture(gl.TEXTURE0);
@@ -1050,10 +1059,14 @@ canvas.addEventListener('wheel', (e) => {
     handleZoom(delta, e.clientX, e.clientY);
 }, { passive: false });
 
-// Circle Control Logic
+// Circle Control Logic - Optimized for smoothness
 function initCircleControl() {
     const circle = document.getElementById('circleControl');
     if (!circle) return;
+
+    let circleRAF = null;
+    let pendingCircleMove = null;
+    let lastIterUpdate = 0;
 
     const handleStart = (x, y) => {
         state.circleDrag.active = true;
@@ -1064,9 +1077,13 @@ function initCircleControl() {
         circle.classList.add('dragging');
     };
 
-    const handleMove = (x, y) => {
-        if (!state.circleDrag.active) return;
+    const processCircleMove = () => {
+        if (!pendingCircleMove) {
+            circleRAF = null;
+            return;
+        }
 
+        const { x, y } = pendingCircleMove;
         const dx = x - state.circleDrag.startX;
         const dy = y - state.circleDrag.startY;
 
@@ -1074,28 +1091,23 @@ function initCircleControl() {
         state.circleDrag.maxDist = Math.max(state.circleDrag.maxDist, dist);
 
         // Vertical Drag -> Zoom
-        // Pull UP (negative dy) -> Zoom IN (requires negative delta)
-        // Pull DOWN (positive dy) -> Zoom OUT (requires positive delta)
         if (Math.abs(dy) > 10) {
             const screenCtx = getScreenContext();
-            // Much lower sensitivity for mobile to prevent "way too rapid" zooming
             const sensitivity = screenCtx.isMobile ? 0.015 : 0.05;
             const zoomDelta = dy * sensitivity;
             handleZoom(zoomDelta);
         }
 
         // Horizontal Drag -> Detail (Iterations)
-        // Drag RIGHT (positive dx) -> Increase Detail
-        // Drag LEFT (negative dx) -> Decrease Detail
-        // Throttle this to prevent stutter
-        const now = Date.now();
-        if (Math.abs(dx) > 10 && (now - state.lastStatsUpdate > 100)) { // Reuse stats timer or new one? Let's just use loose throttling
+        const now = performance.now();
+        if (Math.abs(dx) > 10 && (now - lastIterUpdate > 100)) {
             const iterDelta = Math.floor(dx * 2);
             let newIter = state.circleDrag.startIter + iterDelta;
-            newIter = Math.max(50, Math.min(5000, newIter)); // Clamp
+            newIter = Math.max(50, Math.min(5000, newIter));
 
             if (state.maxIterations !== newIter) {
                 state.maxIterations = newIter;
+                lastIterUpdate = now;
                 // Update UI
                 const iterInput = document.getElementById('iterations');
                 const iterDisplay = document.getElementById('iterValue');
@@ -1110,6 +1122,19 @@ function initCircleControl() {
             const moveX = Math.max(-15, Math.min(15, dx * 0.2));
             const moveY = Math.max(-15, Math.min(15, dy * 0.2));
             inner.style.transform = `translate(${moveX}px, ${moveY}px)`;
+        }
+
+        pendingCircleMove = null;
+        circleRAF = null;
+    };
+
+    const handleMove = (x, y) => {
+        if (!state.circleDrag.active) return;
+
+        pendingCircleMove = { x, y };
+
+        if (!circleRAF) {
+            circleRAF = requestAnimationFrame(processCircleMove);
         }
     };
 
@@ -1127,6 +1152,13 @@ function initCircleControl() {
 
         if (wasTap) {
             toggleControlPanel();
+        }
+
+        // Cancel any pending RAF
+        if (circleRAF) {
+            cancelAnimationFrame(circleRAF);
+            circleRAF = null;
+            pendingCircleMove = null;
         }
     };
 
@@ -1437,22 +1469,39 @@ window.addEventListener('mouseup', () => {
     state.isDragging = false;
 });
 
+// Smooth RAF-throttled mouse move handler
 window.addEventListener('mousemove', (e) => {
     if (!state.isDragging) return;
 
-    const dx = e.clientX - state.lastMouse.x;
-    const dy = e.clientY - state.lastMouse.y;
+    // Store pending interaction data
+    state.pendingInteraction = {
+        type: 'mousemove',
+        clientX: e.clientX,
+        clientY: e.clientY
+    };
 
-    const scale = state.zoomSize / canvas.height;
+    // Process interaction on next animation frame if not already scheduled
+    if (!state.interactionRAF) {
+        state.interactionRAF = requestAnimationFrame(() => {
+            if (state.pendingInteraction && state.pendingInteraction.type === 'mousemove') {
+                const dx = state.pendingInteraction.clientX - state.lastMouse.x;
+                const dy = state.pendingInteraction.clientY - state.lastMouse.y;
 
-    state.targetZoomCenter.x -= dx * scale;
-    state.targetZoomCenter.y += dy * scale;
+                const scale = state.zoomSize / canvas.height;
 
-    state.velocity.x = dx * scale * 0.5;
-    state.velocity.y = dy * scale * 0.5;
+                state.targetZoomCenter.x -= dx * scale;
+                state.targetZoomCenter.y += dy * scale;
 
-    state.lastMouse = { x: e.clientX, y: e.clientY };
-});
+                state.velocity.x = dx * scale * 0.5;
+                state.velocity.y = dy * scale * 0.5;
+
+                state.lastMouse = { x: state.pendingInteraction.clientX, y: state.pendingInteraction.clientY };
+            }
+            state.pendingInteraction = null;
+            state.interactionRAF = null;
+        });
+    }
+}, { passive: true });
 
 // Touch support with improved mobile handling
 let lastTouchDistance = 0;
@@ -1473,64 +1522,90 @@ canvas.addEventListener('touchstart', (e) => {
 canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
 
-    if (e.touches.length === 1 && state.isDragging) {
-        const dx = e.touches[0].clientX - state.lastMouse.x;
-        const dy = e.touches[0].clientY - state.lastMouse.y;
+    // Store touch data for RAF processing
+    const touchData = {
+        type: 'touchmove',
+        touches: Array.from(e.touches).map(t => ({ clientX: t.clientX, clientY: t.clientY })),
+        isDragging: state.isDragging
+    };
 
-        const scale = state.zoomSize / canvas.height;
+    state.pendingInteraction = touchData;
 
-        state.targetZoomCenter.x -= dx * scale;
-        state.targetZoomCenter.y += dy * scale;
-
-        state.velocity.x = dx * scale * 2.0;
-        state.velocity.y = dy * scale * 2.0;
-
-        state.lastMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    } else if (e.touches.length === 2) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-
-        if (lastTouchDistance > 0) {
-            const delta = lastTouchDistance - distance;
-            const screenCtx = getScreenContext();
-
-            // Adaptive zoom sensitivity for mobile
-            const zoomStrength = screenCtx.isMobile ? 0.003 : 0.005;
-
-            const uvx = (centerX - canvas.width / 2) / canvas.height;
-            const uvy = (canvas.height - centerY - canvas.height / 2) / canvas.height;
-
-            const wx = state.targetZoomCenter.x + uvx * state.targetZoomSize;
-            const wy = state.targetZoomCenter.y + uvy * state.targetZoomSize;
-
-            if (delta > 0) {
-                state.targetZoomSize *= (1 + delta * zoomStrength);
-            } else {
-                state.targetZoomSize /= (1 - delta * zoomStrength);
+    // Process on next animation frame if not already scheduled
+    if (!state.interactionRAF) {
+        state.interactionRAF = requestAnimationFrame(() => {
+            const data = state.pendingInteraction;
+            if (!data || data.type !== 'touchmove') {
+                state.pendingInteraction = null;
+                state.interactionRAF = null;
+                return;
             }
 
-            // Apply smooth zoom limit at 0.5x (zoomSize = 6.0)
-            const maxZoomSize = 6.0;
-            if (state.targetZoomSize > maxZoomSize) {
-                // Smooth resistance with subtle bounce
-                const excess = state.targetZoomSize - maxZoomSize;
-                const resistance = 1.0 / (1.0 + excess * 0.5);
-                state.targetZoomSize = maxZoomSize + excess * resistance;
-                
-                // Snap center to (0.75, 0) when at limit
-                state.targetZoomCenter.x = 0.75;
-                state.targetZoomCenter.y = 0.0;
-            } else {
-                // Normal zoom behavior when not at limit
-                state.targetZoomCenter.x = wx - uvx * state.targetZoomSize;
-                state.targetZoomCenter.y = wy - uvy * state.targetZoomSize;
+            const touches = data.touches;
+
+            if (touches.length === 1 && data.isDragging) {
+                const dx = touches[0].clientX - state.lastMouse.x;
+                const dy = touches[0].clientY - state.lastMouse.y;
+
+                const scale = state.zoomSize / canvas.height;
+
+                state.targetZoomCenter.x -= dx * scale;
+                state.targetZoomCenter.y += dy * scale;
+
+                state.velocity.x = dx * scale * 2.0;
+                state.velocity.y = dy * scale * 2.0;
+
+                state.lastMouse = { x: touches[0].clientX, y: touches[0].clientY };
+            } else if (touches.length === 2) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                const centerX = (touches[0].clientX + touches[1].clientX) / 2;
+                const centerY = (touches[0].clientY + touches[1].clientY) / 2;
+
+                if (lastTouchDistance > 0) {
+                    const delta = lastTouchDistance - distance;
+                    const screenCtx = getScreenContext();
+
+                    // Adaptive zoom sensitivity for mobile
+                    const zoomStrength = screenCtx.isMobile ? 0.003 : 0.005;
+
+                    const uvx = (centerX - canvas.width / 2) / canvas.height;
+                    const uvy = (canvas.height - centerY - canvas.height / 2) / canvas.height;
+
+                    const wx = state.targetZoomCenter.x + uvx * state.targetZoomSize;
+                    const wy = state.targetZoomCenter.y + uvy * state.targetZoomSize;
+
+                    if (delta > 0) {
+                        state.targetZoomSize *= (1 + delta * zoomStrength);
+                    } else {
+                        state.targetZoomSize /= (1 - delta * zoomStrength);
+                    }
+
+                    // Apply smooth zoom limit at 0.5x (zoomSize = 6.0)
+                    const maxZoomSize = 6.0;
+                    if (state.targetZoomSize > maxZoomSize) {
+                        // Smooth resistance with subtle bounce
+                        const excess = state.targetZoomSize - maxZoomSize;
+                        const resistance = 1.0 / (1.0 + excess * 0.5);
+                        state.targetZoomSize = maxZoomSize + excess * resistance;
+                        
+                        // Snap center to (0.75, 0) when at limit
+                        state.targetZoomCenter.x = 0.75;
+                        state.targetZoomCenter.y = 0.0;
+                    } else {
+                        // Normal zoom behavior when not at limit
+                        state.targetZoomCenter.x = wx - uvx * state.targetZoomSize;
+                        state.targetZoomCenter.y = wy - uvy * state.targetZoomSize;
+                    }
+                }
+                lastTouchDistance = distance;
             }
-        }
-        lastTouchDistance = distance;
+
+            state.pendingInteraction = null;
+            state.interactionRAF = null;
+        });
     }
 }, { passive: false });
 
