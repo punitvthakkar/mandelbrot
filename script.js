@@ -609,6 +609,7 @@ function drawScene(timestamp) {
 
     if (!state.isAnimating) {
         // Apply smooth zoom limit at 0.5x (zoomSize = 6.0)
+        // Only apply limit if not just finishing an animation (avoid jarring transitions)
         const maxZoomSize = 6.0;
         if (state.targetZoomSize > maxZoomSize) {
             // Smooth resistance with subtle bounce effect
@@ -621,9 +622,14 @@ function drawScene(timestamp) {
             state.targetZoomCenter.y = 0.0;
         }
         
+        // Smooth interpolation to target values
         state.zoomSize += (state.targetZoomSize - state.zoomSize) * lerpFactor;
         state.zoomCenter.x += (state.targetZoomCenter.x - state.zoomCenter.x) * lerpFactor;
         state.zoomCenter.y += (state.targetZoomCenter.y - state.zoomCenter.y) * lerpFactor;
+    } else {
+        // During animation, ensure zoomSize stays in sync with targetZoomSize
+        // This prevents any drift or conflicts between animation and drawScene
+        state.zoomSize = state.targetZoomSize;
     }
 
     resizeCanvasToDisplaySize(gl.canvas);
@@ -766,6 +772,10 @@ function renderCatalogue() {
     });
 }
 
+function getShareText(locationName, shareUrl) {
+    return `Let's go on a trip to ${locationName} on Fractonaut\n\n${shareUrl}`;
+}
+
 function shareLocation(loc) {
     const zoom = loc.zoom || (3.0 / state.zoomSize);
     const params = new URLSearchParams({
@@ -779,16 +789,17 @@ function shareLocation(loc) {
         d: loc.duration || 30
     });
     const shareUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    const shareText = getShareText(loc.title, shareUrl);
 
     // Try Web Share API first (mobile)
     if (navigator.share) {
         navigator.share({
             title: loc.title,
-            text: `Check out this fractal location: ${loc.title}`,
+            text: shareText,
             url: shareUrl
         }).catch(() => {
             // Fallback to clipboard
-            navigator.clipboard.writeText(shareUrl).then(() => {
+            navigator.clipboard.writeText(shareText).then(() => {
                 showToast('Link copied to clipboard!');
             }).catch(() => {
                 showToast('Could not share');
@@ -796,7 +807,7 @@ function shareLocation(loc) {
         });
     } else {
         // Fallback to clipboard
-        navigator.clipboard.writeText(shareUrl).then(() => {
+        navigator.clipboard.writeText(shareText).then(() => {
             showToast('Link copied to clipboard!');
         }).catch(() => {
             showToast('Could not copy link');
@@ -818,6 +829,10 @@ function startHypnoticJourney(loc) {
     const durationInput = document.getElementById('journeyDuration');
     const duration = loc.duration || parseFloat(durationInput.value) || 10;
 
+    // Stop any existing animation first
+    state.isAnimating = false;
+    state.velocity = { x: 0, y: 0 };
+
     // 1. Reset to Home Zoom but Target Location (z = 1x means zoom level 3.0)
     state.zoomCenter = { x: loc.x, y: loc.y };
     state.zoomSize = 3.0; // z = 1x
@@ -829,19 +844,23 @@ function startHypnoticJourney(loc) {
     state.maxIterations = loc.iterations;
 
     // Update UI controls to match
-    document.getElementById('iterations').value = loc.iterations;
-    document.getElementById('iterValue').innerText = loc.iterations;
+    const iterationsEl = document.getElementById('iterations');
+    const iterValueEl = document.getElementById('iterValue');
+    if (iterationsEl) iterationsEl.value = loc.iterations;
+    if (iterValueEl) iterValueEl.innerText = loc.iterations;
     document.querySelectorAll('.palette-card').forEach(c => c.classList.remove('active'));
     const paletteBtn = document.querySelector(`.palette-card[data-palette="${loc.paletteId}"]`);
     if (paletteBtn) paletteBtn.classList.add('active');
 
     // 3. Fade transition
     const canvas = document.getElementById('glCanvas');
-    canvas.classList.remove('canvas-fade', 'fade-in');
-    canvas.classList.add('canvas-fade');
-    setTimeout(() => {
-        canvas.classList.add('fade-in');
-    }, 50);
+    if (canvas) {
+        canvas.classList.remove('canvas-fade', 'fade-in');
+        canvas.classList.add('canvas-fade');
+        setTimeout(() => {
+            canvas.classList.add('fade-in');
+        }, 50);
+    }
 
     // 4. Animate Zoom Only
     state.isAnimating = true;
@@ -850,6 +869,8 @@ function startHypnoticJourney(loc) {
     const targetSize = 3.0 / (loc.zoom || 1.0);
 
     function animate() {
+        if (!state.isAnimating) return; // Safety check
+        
         const now = Date.now();
         const elapsed = (now - startTime) / 1000;
         const t = Math.min(elapsed / duration, 1.0);
@@ -874,13 +895,25 @@ function startHypnoticJourney(loc) {
         if (t < 1.0) {
             requestAnimationFrame(animate);
         } else {
-            state.isAnimating = false;
-            // Show share button popup after flythrough completes
-            showShareButtonPopup(loc);
+            // Ensure final values are set exactly before ending animation
+            state.targetZoomSize = targetSize;
+            state.zoomSize = targetSize;
+            state.targetZoomCenter.x = loc.x;
+            state.targetZoomCenter.y = loc.y;
+            state.zoomCenter.x = loc.x;
+            state.zoomCenter.y = loc.y;
+            
+            // Use requestAnimationFrame to ensure drawScene processes final frame first
+            requestAnimationFrame(() => {
+                state.isAnimating = false;
+                // Show share button popup after flythrough completes
+                showShareButtonPopup(loc);
+            });
         }
     }
 
-    animate();
+    // Start animation on next frame to ensure state is set
+    requestAnimationFrame(animate);
 
     // Close panel on all devices
     const panel = document.getElementById('controlPanel');
@@ -906,6 +939,8 @@ function showShareButtonPopup(loc) {
         d: loc.duration || 30
     });
     const shareUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    const shareText = getShareText(loc.title, shareUrl);
+    const screenCtx = getScreenContext();
 
     // Clear any existing handlers
     shareBtn.onclick = null;
@@ -917,25 +952,32 @@ function showShareButtonPopup(loc) {
 
     // Handle share button click
     shareBtn.onclick = () => {
-        navigator.clipboard.writeText(shareUrl).then(() => {
-            showToast('Link copied to clipboard!');
-            popup.classList.remove('show');
-        }).catch(() => {
-            // Fallback: try Web Share API
-            if (navigator.share) {
-                navigator.share({
-                    title: loc.title,
-                    text: `Check out this fractal location: ${loc.title}`,
-                    url: shareUrl
-                }).then(() => {
+        // Mobile: use Web Share API
+        if (screenCtx.isMobile && navigator.share) {
+            navigator.share({
+                title: loc.title,
+                text: shareText,
+                url: shareUrl
+            }).then(() => {
+                popup.classList.remove('show');
+            }).catch(() => {
+                // Fallback to clipboard if share is cancelled
+                navigator.clipboard.writeText(shareText).then(() => {
+                    showToast('Link copied to clipboard!');
                     popup.classList.remove('show');
                 }).catch(() => {
                     showToast('Could not share');
                 });
-            } else {
+            });
+        } else {
+            // Desktop: copy to clipboard
+            navigator.clipboard.writeText(shareText).then(() => {
+                showToast('Link copied to clipboard!');
+                popup.classList.remove('show');
+            }).catch(() => {
                 showToast('Could not copy link');
-            }
-        });
+            });
+        }
     };
 
     // Auto-hide after 10 seconds
@@ -1233,6 +1275,14 @@ function showAddLocationModal(params) {
         // Set fractal type
         state.fractalType = locationData.fractalType;
 
+        // Update fractal card UI to show correct fractal as active
+        const fractalCards = document.querySelectorAll('.fractal-card');
+        fractalCards.forEach(c => c.classList.remove('active'));
+        const activeFractalCard = document.querySelector(`.fractal-card[data-type="${locationData.fractalType}"]`);
+        if (activeFractalCard) {
+            activeFractalCard.classList.add('active');
+        }
+
         // Refresh catalogue
         renderCatalogue();
 
@@ -1242,11 +1292,13 @@ function showAddLocationModal(params) {
             durationInput.value = locationData.duration;
         }
 
-        // Start trip (flythrough) from (x, y, z=1x) which means zoom level 3.0
-        startHypnoticJourney(newLoc);
-
-        // Clear URL params
+        // Clear URL params first
         window.history.replaceState({}, document.title, window.location.pathname);
+
+        // Small delay to ensure state is set, then start trip (flythrough)
+        setTimeout(() => {
+            startHypnoticJourney(newLoc);
+        }, 100);
     };
 }
 
@@ -1333,8 +1385,9 @@ function saveScene(name, duration) {
     // 3. Refresh Catalogue
     renderCatalogue();
 
-    // 4. Copy URL to Clipboard (silently, no toast)
-    navigator.clipboard.writeText(url).catch(() => {
+    // 4. Copy formatted text to Clipboard (silently, no toast)
+    const shareText = getShareText(name, url);
+    navigator.clipboard.writeText(shareText).catch(() => {
         // Silently fail if clipboard access is not available
     });
 
