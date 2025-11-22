@@ -1680,8 +1680,8 @@ function hideTutorial() {
 document.getElementById('tutorialClose').addEventListener('click', hideTutorial);
 document.getElementById('tutorialNext').addEventListener('click', hideTutorial);
 
-// Show tutorial on first mobile visit
-if (!state.tutorialShown && getScreenContext().isMobile) {
+// Show tutorial on first visit (all devices)
+if (!state.tutorialShown) {
     setTimeout(showTutorial, 1500);
 }
 
