@@ -287,7 +287,7 @@ function getScreenContext() {
 
 // State
 let state = {
-    zoomCenter: { x: -0.75, y: 0.0 },
+    zoomCenter: { x: -0.74364388703, y: 0.1318259042 }, // Start at Seahorse Valley
     zoomSize: 3.0,
     maxIterations: 500,
     paletteId: 0,
@@ -300,7 +300,7 @@ let state = {
     isAnimating: false,
     panelVisible: false,
     lastStatsUpdate: 0,
-    statsUpdateInterval: 100,
+    statsUpdateInterval: 500, // Throttled to 500ms for smoothness
     autoHideTimer: null,
     tutorialShown: localStorage.getItem('mandelbrot_tutorial_shown') === 'true',
     fidgetZoomVelocity: 0,
@@ -843,27 +843,32 @@ function initCircleControl() {
         // Vertical Drag -> Zoom
         // Pull UP (negative dy) -> Zoom IN (requires negative delta)
         // Pull DOWN (positive dy) -> Zoom OUT (requires positive delta)
-        // Previously: -dy * 0.05. If dy = -10 (UP), delta = 0.5 (Positive) -> Zoom OUT. WRONG.
-        // Fix: dy * 0.05. If dy = -10 (UP), delta = -0.5 (Negative) -> Zoom IN. CORRECT.
         if (Math.abs(dy) > 10) {
-            const zoomDelta = dy * 0.05; // Sensitivity
+            const screenCtx = getScreenContext();
+            // Much lower sensitivity for mobile to prevent "way too rapid" zooming
+            const sensitivity = screenCtx.isMobile ? 0.015 : 0.05;
+            const zoomDelta = dy * sensitivity;
             handleZoom(zoomDelta);
         }
 
         // Horizontal Drag -> Detail (Iterations)
         // Drag RIGHT (positive dx) -> Increase Detail
         // Drag LEFT (negative dx) -> Decrease Detail
-        if (Math.abs(dx) > 10) {
+        // Throttle this to prevent stutter
+        const now = Date.now();
+        if (Math.abs(dx) > 10 && (now - state.lastStatsUpdate > 100)) { // Reuse stats timer or new one? Let's just use loose throttling
             const iterDelta = Math.floor(dx * 2);
             let newIter = state.circleDrag.startIter + iterDelta;
             newIter = Math.max(50, Math.min(5000, newIter)); // Clamp
-            state.maxIterations = newIter;
 
-            // Update UI
-            const iterInput = document.getElementById('iterations');
-            const iterDisplay = document.getElementById('iterValue');
-            if (iterInput) iterInput.value = newIter;
-            if (iterDisplay) iterDisplay.innerText = newIter;
+            if (state.maxIterations !== newIter) {
+                state.maxIterations = newIter;
+                // Update UI
+                const iterInput = document.getElementById('iterations');
+                const iterDisplay = document.getElementById('iterValue');
+                if (iterInput) iterInput.value = newIter;
+                if (iterDisplay) iterDisplay.innerText = newIter;
+            }
         }
 
         // Visual Feedback
