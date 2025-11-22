@@ -1778,39 +1778,53 @@ const pwaPrompt = document.getElementById('pwaInstallPrompt');
 const installBtn = document.getElementById('pwaInstallBtn');
 const closePwaBtn = document.getElementById('pwaCloseBtn');
 
-// Check if app is already installed (standalone mode)
+// Check if app is currently installed (standalone mode)
 function isAppInstalled() {
     return window.matchMedia('(display-mode: standalone)').matches ||
         window.navigator.standalone === true ||
-        document.referrer.includes('android-app://') ||
-        localStorage.getItem('pwa_installed') === 'true';
+        document.referrer.includes('android-app://');
 }
 
-// Check if prompt was dismissed
+// Check if prompt was dismissed in this session
 function wasPromptDismissed() {
-    return localStorage.getItem('pwa_prompt_dismissed') === 'true';
+    return sessionStorage.getItem('pwa_prompt_dismissed') === 'true';
 }
 
-// Mark prompt as dismissed
+// Mark prompt as dismissed (session only)
 function dismissPrompt() {
-    localStorage.setItem('pwa_prompt_dismissed', 'true');
+    sessionStorage.setItem('pwa_prompt_dismissed', 'true');
     pwaPrompt.classList.add('hidden');
 }
 
-// Mark app as installed
+// Mark app as installed (persistent)
 function markAppInstalled() {
     localStorage.setItem('pwa_installed', 'true');
     pwaPrompt.classList.add('hidden');
     deferredPrompt = null;
 }
 
+// Check if app was previously installed but is now uninstalled
+function wasAppUninstalled() {
+    const wasInstalled = localStorage.getItem('pwa_installed') === 'true';
+    const isCurrentlyInstalled = isAppInstalled();
+    
+    // If it was installed but is no longer in standalone mode, it was uninstalled
+    if (wasInstalled && !isCurrentlyInstalled) {
+        // Clear the installed flag so we can show prompt again
+        localStorage.removeItem('pwa_installed');
+        return true;
+    }
+    
+    return false;
+}
+
 // Check if we should show the prompt
 function shouldShowPrompt() {
-    // Don't show if already installed
+    // Don't show if currently installed
     if (isAppInstalled()) {
         return false;
     }
-    // Don't show if previously dismissed
+    // Don't show if dismissed in this session
     if (wasPromptDismissed()) {
         return false;
     }
@@ -1848,7 +1862,7 @@ installBtn.addEventListener('click', async () => {
     deferredPrompt = null;
     // Hide our custom UI
     pwaPrompt.classList.add('hidden');
-    // Mark as dismissed if user declined, or mark as installed if accepted
+    // Mark as dismissed if user declined (session only), or mark as installed if accepted
     if (outcome === 'dismissed') {
         dismissPrompt();
     } else if (outcome === 'accepted') {
@@ -1865,13 +1879,18 @@ window.addEventListener('appinstalled', () => {
     // Hide the app-provided install promotion
     pwaPrompt.classList.add('hidden');
     deferredPrompt = null;
-    // Mark as installed so prompt never shows again
+    // Mark as installed so prompt never shows again (until uninstalled)
     markAppInstalled();
     console.log('PWA was installed');
 });
 
-// Check on load if we should hide the prompt
-// Only show if not installed and not dismissed
+// Check on load if we should show/hide the prompt
+// Detect if app was uninstalled
+if (wasAppUninstalled()) {
+    console.log('PWA was uninstalled, prompt will show again next session');
+}
+
+// Hide prompt if currently installed or dismissed in this session
 if (isAppInstalled() || wasPromptDismissed()) {
     pwaPrompt.classList.add('hidden');
 }
