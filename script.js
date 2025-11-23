@@ -317,7 +317,16 @@ let state = {
     circleDrag: { active: false, startX: 0, startY: 0, startIter: 0 },
     pendingInteraction: null, // For RAF-throttled interactions
     interactionRAF: null, // Track RAF ID for interactions
-    pendingScreenshot: false // New flag for screenshot handling
+    pendingScreenshot: false, // New flag for screenshot handling
+
+    // Performance Logging
+    isTestMode: true, // Enable logging
+    perfLogs: [],
+    perfStartTime: 0,
+    perfTimer: null,
+    currentFps: 0,
+    frameCount: 0,
+    lastFpsTime: 0
 };
 
 const locations = {
@@ -598,6 +607,19 @@ function drawScene(timestamp) {
     if (!lastTime) lastTime = timestamp;
     const deltaTime = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
+
+    // FPS Calculation
+    state.frameCount++;
+    if (timestamp - state.lastFpsTime >= 500) {
+        state.currentFps = Math.round((state.frameCount * 1000) / (timestamp - state.lastFpsTime));
+        state.frameCount = 0;
+        state.lastFpsTime = timestamp;
+
+        // Log data if in test mode and active
+        if (state.isTestMode && state.perfTimer) {
+            logPerformanceData();
+        }
+    }
 
     // Velocity physics - only when not dragging or animating
     if (!state.isDragging && !state.isAnimating) {
@@ -1034,6 +1056,76 @@ function showShareButtonPopup(loc) {
 
 // Initialize Catalogue
 renderCatalogue();
+
+// Performance Logging Logic
+function startPerformanceLogging() {
+    if (!state.isTestMode) return;
+
+    console.log('Starting performance logging...');
+    state.perfLogs = [];
+    state.perfStartTime = Date.now();
+
+    // Clear existing timer if any
+    if (state.perfTimer) clearInterval(state.perfTimer);
+
+    // We use the draw loop for timing to sync with frames, 
+    // but we set a flag here to indicate logging is active.
+    // Actually, let's just set a simple interval for the stop condition check
+    // and rely on drawScene for the actual data capture to get accurate FPS.
+    // Wait, user asked for 500ms interval.
+    // I implemented the capture inside drawScene's 500ms FPS check block.
+    // So here we just set the "active" state.
+    state.perfTimer = true; // Flag to say "we are logging"
+
+    // Stop after 30 seconds
+    setTimeout(() => {
+        stopPerformanceLogging();
+    }, 30000);
+}
+
+function logPerformanceData() {
+    const elapsed = (Date.now() - state.perfStartTime) / 1000;
+    const entry = {
+        time: elapsed.toFixed(1),
+        fps: state.currentFps,
+        x: state.zoomCenter.x.toFixed(6),
+        y: state.zoomCenter.y.toFixed(6),
+        zoom: (3.0 / state.zoomSize).toFixed(2),
+        iterations: state.maxIterations
+    };
+    state.perfLogs.push(entry);
+}
+
+function stopPerformanceLogging() {
+    if (!state.perfTimer) return;
+    state.perfTimer = false;
+    console.log('Performance logging complete. Downloading CSV...');
+    downloadPerformanceCSV();
+}
+
+function downloadPerformanceCSV() {
+    if (state.perfLogs.length === 0) return;
+
+    const headers = ['Time (s)', 'FPS', 'X', 'Y', 'Zoom', 'Iterations'];
+    const rows = state.perfLogs.map(log =>
+        `${log.time},${log.fps},${log.x},${log.y},${log.zoom},${log.iterations}`
+    );
+
+    const csvContent = "data:text/csv;charset=utf-8,"
+        + headers.join(",") + "\n"
+        + rows.join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `fractonaut_perf_log_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Start logging on load
+startPerformanceLogging();
 
 // Context-aware zoom with screen size adaptation
 function handleZoom(delta, x, y) {
