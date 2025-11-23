@@ -26,6 +26,9 @@ const fsSource = `#version 300 es
     // Output color
     out vec4 outColor;
 
+    // Constants
+    const float split = 8193.0;
+
     // Emulated double math functions
     vec2 ds_add(vec2 dsa, vec2 dsb) {
         vec2 dsc;
@@ -52,7 +55,7 @@ const fsSource = `#version 300 es
     vec2 ds_mul(vec2 dsa, vec2 dsb) {
         vec2 dsc;
         float c11, c21, c2, e, t1, t2;
-        float a1, a2, b1, b2, cona, conb, split = 8193.0;
+        float a1, a2, b1, b2, cona, conb;
         
         cona = dsa.x * split;
         a1 = cona - (cona - dsa.x);
@@ -82,7 +85,7 @@ const fsSource = `#version 300 es
     vec2 ds_sqr(vec2 dsa) {
         vec2 dsc;
         float c11, c21, c2, e, t1, t2;
-        float a1, a2, cona, split = 8193.0;
+        float a1, a2, cona;
         
         cona = dsa.x * split;
         a1 = cona - (cona - dsa.x);
@@ -177,35 +180,28 @@ const fsSource = `#version 300 es
                 z_y = vec2(0.0);
             }
             
-            for (int i = 0; i < 10000; i += 5) {
+            for (int i = 0; i < 10000; i++) {
                 if (i >= u_maxIterations) break;
                 
-                // Unrolled Loop (5x)
-                for (int j = 0; j < 5; j++) {
-                    if (i + j >= u_maxIterations) break;
-
-                    vec2 z_x2 = ds_sqr(z_x);
-                    vec2 z_y2 = ds_sqr(z_y);
-                    
-                    if (z_x2.x + z_y2.x > 4.0) {
-                        escaped = true;
-                        iterations = float(i + j);
-                        log_zn = log2(z_x2.x + z_y2.x) / 2.0;
-                        // Break out of inner loop
-                        i = 10000; // Force outer break
-                        break;
-                    }
-
-                    vec2 z_xy = ds_mul(z_x, z_y);
-                    vec2 two_z_xy = ds_add(z_xy, z_xy);
-                    vec2 new_y = ds_add(two_z_xy, c_y);
-
-                    vec2 diff_sq = ds_sub(z_x2, z_y2);
-                    vec2 new_x = ds_add(diff_sq, c_x);
-
-                    z_x = new_x;
-                    z_y = new_y;
+                vec2 z_x2 = ds_sqr(z_x);
+                vec2 z_y2 = ds_sqr(z_y);
+                
+                if (z_x2.x + z_y2.x > 4.0) {
+                    escaped = true;
+                    iterations = float(i);
+                    log_zn = log2(z_x2.x + z_y2.x) / 2.0;
+                    break;
                 }
+
+                vec2 z_xy = ds_mul(z_x, z_y);
+                vec2 two_z_xy = ds_add(z_xy, z_xy);
+                vec2 new_y = ds_add(two_z_xy, c_y);
+
+                vec2 diff_sq = ds_sub(z_x2, z_y2);
+                vec2 new_x = ds_add(diff_sq, c_x);
+
+                z_x = new_x;
+                z_y = new_y;
             }
         } else {
             vec2 c, z;
