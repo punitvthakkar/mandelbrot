@@ -303,6 +303,48 @@
         </div>
     </div>
 
+    <!-- Export Resolution Selection Modal -->
+    <div id="exportResolutionModal" class="modal hidden">
+        <div class="modal-content save-modal-content">
+            <h3>Select Export Resolution</h3>
+            <div class="input-group">
+                <label>Resolution</label>
+                <div class="resolution-grid">
+                    <button class="resolution-option" data-width="3840" data-height="2160">
+                        <span class="resolution-label">4K</span>
+                        <span class="resolution-detail">3840 × 2160</span>
+                    </button>
+                    <button class="resolution-option" data-width="7680" data-height="4320">
+                        <span class="resolution-label">8K</span>
+                        <span class="resolution-detail">7680 × 4320</span>
+                    </button>
+                    <button class="resolution-option" data-width="15360" data-height="8640">
+                        <span class="resolution-label">16K</span>
+                        <span class="resolution-detail">15360 × 8640</span>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="cancelExportBtn" class="btn-secondary">Cancel</button>
+                <button id="confirmExportBtn" class="btn-primary" disabled>Export</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Loading Overlay -->
+    <div id="exportLoadingOverlay" class="export-loading-overlay hidden">
+        <div class="export-loading-content">
+            <h3>Exporting Fractal</h3>
+            <div class="loading-bar-container">
+                <div class="loading-bar-track">
+                    <div class="loading-bar-fill" id="loadingBarFill"></div>
+                </div>
+                <div class="loading-percentage" id="loadingPercentage">0%</div>
+            </div>
+            <p class="loading-status" id="loadingStatus">Preparing export...</p>
+        </div>
+    </div>
+
     <!-- PWA Install Prompt (Mobile) -->
     <div id="pwaInstallPrompt" class="pwa-prompt hidden">
         <div class="pwa-content">

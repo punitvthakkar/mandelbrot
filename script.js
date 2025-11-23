@@ -345,7 +345,7 @@ let state = {
     circleDrag: { active: false, startX: 0, startY: 0, startIter: 0 },
     pendingInteraction: null, // For RAF-throttled interactions
     interactionRAF: null, // Track RAF ID for interactions
-    pendingScreenshot: false, // New flag for screenshot handling
+    exportResolution: { width: 3840, height: 2160 }, // Default 4K export resolution
 
     // Performance Logging
     isTestMode: true, // Enable logging
@@ -736,19 +736,6 @@ function drawScene(timestamp) {
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-    // Handle screenshot if pending (must be done immediately after draw)
-    if (state.pendingScreenshot) {
-        state.pendingScreenshot = false;
-        try {
-            const link = document.createElement('a');
-            link.download = `fractonaut_${Date.now()}.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        } catch (e) {
-            console.error('Screenshot failed:', e);
-        }
-    }
-
     updateStats();
     requestAnimationFrame(drawScene);
 }
@@ -767,6 +754,132 @@ function resizeCanvasToDisplaySize(canvas) {
         canvas.width = displayWidth;
         canvas.height = displayHeight;
     }
+}
+
+/**
+ * Renders the current fractal view to a high-resolution off-screen canvas
+ * @param {number} exportWidth - Desired export width (e.g., 3840 for 4K)
+ * @param {number} exportHeight - Desired export height (e.g., 2160 for 4K)
+ * @returns {Promise<string>} Promise resolving to data URL of the rendered image
+ */
+async function renderHighResolutionExport(exportWidth = 3840, exportHeight = 2160) {
+    return new Promise((resolve, reject) => {
+        try {
+            // Create off-screen canvas
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = exportWidth;
+            exportCanvas.height = exportHeight;
+            
+            // Create WebGL context for export canvas
+            const exportGl = exportCanvas.getContext('webgl2', {
+                preserveDrawingBuffer: true, // Important: keep buffer for export
+                alpha: false,
+                antialias: false,
+                depth: false,
+                stencil: false
+            });
+            
+            if (!exportGl) {
+                reject(new Error('Failed to create WebGL context for export'));
+                return;
+            }
+            
+            // Initialize shader program for export context (reuse same shaders)
+            const exportShaderProgram = initShaderProgram(exportGl, vsSource, fsSource);
+            if (!exportShaderProgram) {
+                reject(new Error('Failed to initialize shader program for export'));
+                return;
+            }
+            
+            // Set up program info for export context
+            const exportProgramInfo = {
+                program: exportShaderProgram,
+                attribLocations: {
+                    vertexPosition: exportGl.getAttribLocation(exportShaderProgram, 'aVertexPosition'),
+                },
+                uniformLocations: {
+                    resolution: exportGl.getUniformLocation(exportShaderProgram, 'u_resolution'),
+                    zoomCenterX: exportGl.getUniformLocation(exportShaderProgram, 'u_zoomCenter_x'),
+                    zoomCenterY: exportGl.getUniformLocation(exportShaderProgram, 'u_zoomCenter_y'),
+                    zoomSize: exportGl.getUniformLocation(exportShaderProgram, 'u_zoomSize'),
+                    maxIterations: exportGl.getUniformLocation(exportShaderProgram, 'u_maxIterations'),
+                    paletteId: exportGl.getUniformLocation(exportShaderProgram, 'u_paletteId'),
+                    highPrecision: exportGl.getUniformLocation(exportShaderProgram, 'u_highPrecision'),
+                    paletteTexture: exportGl.getUniformLocation(exportShaderProgram, 'u_paletteTexture'),
+                    fractalType: exportGl.getUniformLocation(exportShaderProgram, 'u_fractalType'),
+                    juliaC: exportGl.getUniformLocation(exportShaderProgram, 'u_juliaC'),
+                },
+            };
+            
+            // Create position buffer for export context
+            const exportPositionBuffer = exportGl.createBuffer();
+            exportGl.bindBuffer(exportGl.ARRAY_BUFFER, exportPositionBuffer);
+            const positions = [-1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0];
+            exportGl.bufferData(exportGl.ARRAY_BUFFER, new Float32Array(positions), exportGl.STATIC_DRAW);
+            
+            // Create palette texture for export context
+            const exportPaletteTexture = exportGl.createTexture();
+            exportGl.bindTexture(exportGl.TEXTURE_2D, exportPaletteTexture);
+            const textureData = generateFractalExtremePalette();
+            exportGl.texImage2D(exportGl.TEXTURE_2D, 0, exportGl.RGBA, 2048, 1, 0, exportGl.RGBA, exportGl.UNSIGNED_BYTE, textureData);
+            exportGl.texParameteri(exportGl.TEXTURE_2D, exportGl.TEXTURE_WRAP_S, exportGl.REPEAT);
+            exportGl.texParameteri(exportGl.TEXTURE_2D, exportGl.TEXTURE_WRAP_T, exportGl.REPEAT);
+            exportGl.texParameteri(exportGl.TEXTURE_2D, exportGl.TEXTURE_MIN_FILTER, exportGl.LINEAR);
+            exportGl.texParameteri(exportGl.TEXTURE_2D, exportGl.TEXTURE_MAG_FILTER, exportGl.LINEAR);
+            
+            // Set viewport
+            exportGl.viewport(0, 0, exportWidth, exportHeight);
+            
+            // Clear and render
+            exportGl.clearColor(0.0, 0.0, 0.0, 1.0);
+            exportGl.clear(exportGl.COLOR_BUFFER_BIT);
+            
+            exportGl.useProgram(exportProgramInfo.program);
+            
+            // Vertex setup
+            exportGl.bindBuffer(exportGl.ARRAY_BUFFER, exportPositionBuffer);
+            exportGl.vertexAttribPointer(exportProgramInfo.attribLocations.vertexPosition, 2, exportGl.FLOAT, false, 0, 0);
+            exportGl.enableVertexAttribArray(exportProgramInfo.attribLocations.vertexPosition);
+            
+            // Set uniforms with current state
+            exportGl.uniform2f(exportProgramInfo.uniformLocations.resolution, exportWidth, exportHeight);
+            
+            const centerXSplit = splitDouble(state.zoomCenter.x);
+            const centerYSplit = splitDouble(state.zoomCenter.y);
+            const zoomSizeSplit = splitDouble(state.zoomSize);
+            
+            exportGl.uniform2f(exportProgramInfo.uniformLocations.zoomCenterX, centerXSplit[0], centerXSplit[1]);
+            exportGl.uniform2f(exportProgramInfo.uniformLocations.zoomCenterY, centerYSplit[0], centerYSplit[1]);
+            exportGl.uniform2f(exportProgramInfo.uniformLocations.zoomSize, zoomSizeSplit[0], zoomSizeSplit[1]);
+            
+            exportGl.uniform1i(exportProgramInfo.uniformLocations.maxIterations, state.maxIterations);
+            exportGl.uniform1i(exportProgramInfo.uniformLocations.paletteId, state.paletteId);
+            exportGl.uniform1i(exportProgramInfo.uniformLocations.fractalType, state.fractalType);
+            exportGl.uniform2f(exportProgramInfo.uniformLocations.juliaC, state.juliaC.x, state.juliaC.y);
+            
+            const highPrecision = state.zoomSize < 0.001 && state.fractalType < 2;
+            exportGl.uniform1i(exportProgramInfo.uniformLocations.highPrecision, highPrecision ? 1 : 0);
+            
+            exportGl.activeTexture(exportGl.TEXTURE0);
+            exportGl.bindTexture(exportGl.TEXTURE_2D, exportPaletteTexture);
+            exportGl.uniform1i(exportProgramInfo.uniformLocations.paletteTexture, 0);
+            
+            // Render
+            exportGl.drawArrays(exportGl.TRIANGLE_STRIP, 0, 4);
+            
+            // Export as data URL
+            const dataUrl = exportCanvas.toDataURL('image/png');
+            
+            // Cleanup
+            exportGl.deleteBuffer(exportPositionBuffer);
+            exportGl.deleteTexture(exportPaletteTexture);
+            exportGl.deleteProgram(exportShaderProgram);
+            
+            resolve(dataUrl);
+        } catch (error) {
+            reject(error);
+        }
+    });
 }
 
 function updateStats() {
@@ -1902,12 +2015,201 @@ if (resetButton) {
     resetButton.addEventListener('click', resetView);
 }
 
+// Export Resolution Selection Modal
+function initExportResolutionModal() {
+    const modal = document.getElementById('exportResolutionModal');
+    const resolutionOptions = document.querySelectorAll('.resolution-option');
+    const cancelBtn = document.getElementById('cancelExportBtn');
+    const confirmBtn = document.getElementById('confirmExportBtn');
+    let selectedResolution = null;
+
+    // Set default selection (4K)
+    if (resolutionOptions.length > 0) {
+        resolutionOptions[0].classList.add('selected');
+        selectedResolution = {
+            width: parseInt(resolutionOptions[0].dataset.width),
+            height: parseInt(resolutionOptions[0].dataset.height)
+        };
+        confirmBtn.disabled = false;
+    }
+
+    // Handle resolution option clicks
+    resolutionOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            // Remove selected class from all options
+            resolutionOptions.forEach(opt => opt.classList.remove('selected'));
+            // Add selected class to clicked option
+            option.classList.add('selected');
+            
+            selectedResolution = {
+                width: parseInt(option.dataset.width),
+                height: parseInt(option.dataset.height)
+            };
+            confirmBtn.disabled = false;
+        });
+    });
+
+    // Handle cancel
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            selectedResolution = null;
+            // Reset to default (4K)
+            resolutionOptions.forEach(opt => opt.classList.remove('selected'));
+            if (resolutionOptions.length > 0) {
+                resolutionOptions[0].classList.add('selected');
+                selectedResolution = {
+                    width: parseInt(resolutionOptions[0].dataset.width),
+                    height: parseInt(resolutionOptions[0].dataset.height)
+                };
+            }
+        });
+    }
+
+    // Handle confirm export
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', async () => {
+            if (!selectedResolution) return;
+            
+            // Close modal
+            modal.classList.add('hidden');
+            
+            // Show loading overlay
+            const loadingOverlay = document.getElementById('exportLoadingOverlay');
+            const loadingBarFill = document.getElementById('loadingBarFill');
+            const loadingPercentage = document.getElementById('loadingPercentage');
+            const loadingStatus = document.getElementById('loadingStatus');
+            
+            if (loadingOverlay) {
+                loadingOverlay.classList.remove('hidden');
+            }
+            
+            // Helper function to update progress
+            const updateProgress = (percent, status) => {
+                if (loadingBarFill) {
+                    loadingBarFill.style.width = `${percent}%`;
+                }
+                if (loadingPercentage) {
+                    loadingPercentage.textContent = `${Math.round(percent)}%`;
+                }
+                if (loadingStatus) {
+                    loadingStatus.textContent = status;
+                }
+            };
+            
+            // Show loading state on screenshot button
+            const screenshotBtn = document.getElementById('screenshotBtn');
+            const btnSpan = screenshotBtn?.querySelector('span');
+            const originalText = btnSpan?.textContent;
+            if (btnSpan) {
+                btnSpan.textContent = 'Rendering...';
+            }
+            if (screenshotBtn) {
+                screenshotBtn.disabled = true;
+            }
+            
+            try {
+                // Calculate dimensions maintaining aspect ratio
+                const aspectRatio = canvas.clientWidth / canvas.clientHeight;
+                let exportWidth = selectedResolution.width;
+                let exportHeight = selectedResolution.height;
+                
+                // Adjust height to maintain aspect ratio if needed
+                const calculatedHeight = Math.round(exportWidth / aspectRatio);
+                if (Math.abs(calculatedHeight - exportHeight) / exportHeight > 0.1) {
+                    exportHeight = calculatedHeight;
+                }
+                
+                // Animate progress bar
+                updateProgress(10, 'Initializing export...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                updateProgress(30, 'Setting up high-resolution canvas...');
+                await new Promise(resolve => setTimeout(resolve, 150));
+                
+                updateProgress(50, 'Rendering fractal...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Render high-resolution version
+                const dataUrl = await renderHighResolutionExport(exportWidth, exportHeight);
+                
+                updateProgress(80, 'Processing image data...');
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                updateProgress(95, 'Preparing download...');
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                // Download
+                const link = document.createElement('a');
+                link.download = `fractonaut_${exportWidth}x${exportHeight}_${Date.now()}.png`;
+                link.href = dataUrl;
+                link.click();
+                
+                updateProgress(100, 'Export complete!');
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                showToast(`Exported at ${exportWidth}×${exportHeight}px`);
+            } catch (error) {
+                console.error('High-res export failed:', error);
+                updateProgress(0, 'Export failed. Trying standard resolution...');
+                
+                // Fallback to standard export
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    updateProgress(50, 'Rendering at display resolution...');
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    const link = document.createElement('a');
+                    link.download = `fractonaut_${Date.now()}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    
+                    updateProgress(100, 'Export complete!');
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    
+                    showToast('Exported at display resolution');
+                } catch (fallbackError) {
+                    console.error('Fallback export failed:', fallbackError);
+                    updateProgress(0, 'Export failed');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    showToast('Export failed');
+                }
+            } finally {
+                // Hide loading overlay
+                if (loadingOverlay) {
+                    loadingOverlay.classList.add('hidden');
+                }
+                
+                // Reset progress bar
+                updateProgress(0, '');
+                
+                // Restore button state
+                if (btnSpan) {
+                    btnSpan.textContent = originalText || 'Save';
+                }
+                if (screenshotBtn) {
+                    screenshotBtn.disabled = false;
+                }
+            }
+        });
+    }
+
+    return { modal, selectedResolution };
+}
+
 const screenshotBtn = document.getElementById('screenshotBtn');
 if (screenshotBtn) {
     screenshotBtn.addEventListener('click', () => {
-        state.pendingScreenshot = true;
+        // Show resolution selection modal
+        const modal = document.getElementById('exportResolutionModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
     });
 }
+
+// Initialize export resolution modal
+initExportResolutionModal();
 
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 if (fullscreenBtn) {
