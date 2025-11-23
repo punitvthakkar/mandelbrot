@@ -209,24 +209,24 @@ canvas:active {
 
 /* Plus Button - positioned to the right of joystick */
 .plus-button {
-    right: calc(50% + 60px);
-    transform: translateX(50%) translateZ(0);
-    -webkit-transform: translateX(50%) translateZ(0);
+    left: calc(50% + 88px);
+    transform: translateX(-50%) translateZ(0);
+    -webkit-transform: translateX(-50%) translateZ(0);
 }
 
 .plus-button:hover {
-    transform: translateX(50%) scale(1.05) translateZ(0);
-    -webkit-transform: translateX(50%) scale(1.05) translateZ(0);
+    transform: translateX(-50%) scale(1.05) translateZ(0);
+    -webkit-transform: translateX(-50%) scale(1.05) translateZ(0);
 }
 
 .plus-button:active {
-    transform: translateX(50%) scale(0.95) translateZ(0);
-    -webkit-transform: translateX(50%) scale(0.95) translateZ(0);
+    transform: translateX(-50%) scale(0.95) translateZ(0);
+    -webkit-transform: translateX(-50%) scale(0.95) translateZ(0);
 }
 
 /* Reset Button - positioned to the left of joystick */
 .reset-button {
-    left: calc(50% - 60px);
+    left: calc(50% - 88px);
     transform: translateX(-50%) translateZ(0);
     -webkit-transform: translateX(-50%) translateZ(0);
 }
@@ -1248,11 +1248,11 @@ canvas:active {
     }
 
     .plus-button {
-        right: calc(50% + 52px);
+        left: calc(50% + 76px);
     }
 
     .reset-button {
-        left: calc(50% - 52px);
+        left: calc(50% - 76px);
     }
 }
 

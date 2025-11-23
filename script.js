@@ -1365,17 +1365,44 @@ const nameSuggestions = [
 ];
 
 function calculateDurationFromZoom(zoom) {
-    // Base duration: 10 seconds
-    // Max duration: 45 seconds
-    // Scale proportionally with zoom (logarithmic for smoothness)
-    const minZoom = 1.0;
-    const maxZoom = 10000.0; // Reasonable max zoom
-    const logZoom = Math.log10(Math.max(minZoom, Math.min(maxZoom, zoom)));
-    const logMin = Math.log10(minZoom);
-    const logMax = Math.log10(maxZoom);
-    const normalized = (logZoom - logMin) / (logMax - logMin);
-    const duration = 10 + (normalized * 35); // 10 to 45 range
-    return Math.round(duration);
+    // Calculate smooth GPU-friendly duration based on zoom level
+    // Formula ensures smooth 60fps animation with appropriate frame budget
+    // 
+    // Key principles:
+    // 1. Minimum duration ensures smooth animation (enough frames at 60fps)
+    // 2. Logarithmic scaling matches exponential nature of zoom
+    // 3. Deeper zooms need more time for detail rendering
+    // 4. Capped at reasonable maximum to avoid excessive wait times
+    
+    // Constants for smooth animation
+    const TARGET_FPS = 60; // Standard GPU frame rate for smooth animation
+    const MIN_DURATION = 4.0; // Minimum seconds for smooth shallow zoom (240 frames)
+    const MAX_DURATION = 60.0; // Maximum seconds for very deep zooms (3600 frames)
+    
+    // Clamp zoom to reasonable range (1x to 100,000x)
+    const clampedZoom = Math.max(1.0, Math.min(zoom, 100000.0));
+    
+    // Use logarithmic scaling since zoom is exponential
+    // log10(zoom) converts exponential zoom to linear scale
+    // Example: zoom 1x → log=0, zoom 10x → log=1, zoom 100x → log=2, zoom 1000x → log=3
+    const logZoom = Math.log10(clampedZoom);
+    
+    // Normalize log zoom to 0-1 range
+    // log10(1) = 0, log10(100000) ≈ 5
+    const logMin = 0;
+    const logMax = 5;
+    const normalizedLog = Math.min(1.0, (logZoom - logMin) / (logMax - logMin));
+    
+    // Apply smooth easing curve for natural feel
+    // Quadratic easing: slower start, faster end (feels more natural for deep zooms)
+    const easedNormalized = normalizedLog * normalizedLog;
+    
+    // Calculate duration: linear interpolation between min and max
+    // Formula: duration = MIN + (eased * (MAX - MIN))
+    const duration = MIN_DURATION + (easedNormalized * (MAX_DURATION - MIN_DURATION));
+    
+    // Round to nearest 0.5 seconds for cleaner UI values
+    return Math.round(duration * 2) / 2;
 }
 
 function showToast(message) {
@@ -1668,29 +1695,49 @@ document.querySelectorAll('.palette-card').forEach(btn => {
 // Reset function (shared by both reset buttons)
 function resetView() {
     state.velocity = { x: 0, y: 0 };
-    state.maxIterations = 500;
-    state.paletteId = 0;
-
+    
+    // Randomly select palette (0-9, 10 palettes total)
+    state.paletteId = Math.floor(Math.random() * 10);
+    
+    // Randomly select complexity based on fractal type
     if (state.fractalType === 2) { // Sierpinski
         state.targetZoomCenter = { x: 0.5, y: 0.288 };
         state.targetZoomSize = 1.5;
-        state.maxIterations = 200;
+        // Sierpinski: random iterations between 150-400
+        state.maxIterations = Math.floor(Math.random() * 250) + 150;
+        // Round to nearest 50 for cleaner values
+        state.maxIterations = Math.round(state.maxIterations / 50) * 50;
     } else if (state.fractalType === 1) { // Julia
         state.targetZoomCenter = { x: 0.0, y: 0.0 };
         state.targetZoomSize = 3.0;
+        // Julia: random iterations between 300-1500
+        state.maxIterations = Math.floor(Math.random() * 1200) + 300;
+        // Round to nearest 50
+        state.maxIterations = Math.round(state.maxIterations / 50) * 50;
     } else { // Mandelbrot
         state.targetZoomCenter = { x: -0.75, y: 0.0 };
         state.targetZoomSize = 3.0;
+        // Mandelbrot: random iterations between 300-2000
+        state.maxIterations = Math.floor(Math.random() * 1700) + 300;
+        // Round to nearest 50
+        state.maxIterations = Math.round(state.maxIterations / 50) * 50;
     }
 
     state.zoomCenter = { ...state.targetZoomCenter };
     state.zoomSize = state.targetZoomSize;
 
-    // Reset UI controls
-    document.getElementById('iterations').value = state.maxIterations;
-    document.getElementById('iterValue').innerText = state.maxIterations;
+    // Reset UI controls with random values
+    const iterationsEl = document.getElementById('iterations');
+    const iterValueEl = document.getElementById('iterValue');
+    if (iterationsEl) iterationsEl.value = state.maxIterations;
+    if (iterValueEl) iterValueEl.innerText = state.maxIterations;
+    
+    // Update palette UI to show random selection
     document.querySelectorAll('.palette-card').forEach(c => c.classList.remove('active'));
-    document.querySelector('.palette-card[data-palette="0"]').classList.add('active');
+    const selectedPaletteBtn = document.querySelector(`.palette-card[data-palette="${state.paletteId}"]`);
+    if (selectedPaletteBtn) {
+        selectedPaletteBtn.classList.add('active');
+    }
 }
 
 // Quick Actions
