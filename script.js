@@ -1634,8 +1634,8 @@ canvas.addEventListener('touchmove', (e) => {
                     // Adaptive zoom sensitivity for mobile
                     const zoomStrength = screenCtx.isMobile ? 0.003 : 0.005;
 
-                    const uvx = (centerX - canvas.width / 2) / canvas.height;
-                    const uvy = (canvas.height - centerY - canvas.height / 2) / canvas.height;
+                    const uvx = (centerX - canvas.clientWidth / 2) / canvas.clientHeight;
+                    const uvy = (canvas.clientHeight - centerY - canvas.clientHeight / 2) / canvas.clientHeight;
 
                     const wx = state.targetZoomCenter.x + uvx * state.targetZoomSize;
                     const wy = state.targetZoomCenter.y + uvy * state.targetZoomSize;
