@@ -79,6 +79,31 @@ const fsSource = `#version 300 es
         return dsc;
     }
 
+    vec2 ds_sqr(vec2 dsa) {
+        vec2 dsc;
+        float c11, c21, c2, e, t1, t2;
+        float a1, a2, cona, split = 8193.0;
+        
+        cona = dsa.x * split;
+        a1 = cona - (cona - dsa.x);
+        a2 = dsa.x - a1;
+        
+        c11 = dsa.x * dsa.x;
+        c21 = a1 * a1 - c11;
+        c21 += 2.0 * a1 * a2;
+        c21 += a2 * a2;
+        
+        c2 = 2.0 * dsa.x * dsa.y;
+        
+        t1 = c11 + c2;
+        e = t1 - c11;
+        t2 = dsa.y * dsa.y + ((c2 - e) + (c11 - (t1 - e))) + c21;
+        
+        dsc.x = t1 + t2;
+        dsc.y = t2 - (dsc.x - t1);
+        return dsc;
+    }
+
     vec3 palette( float t, vec3 a, vec3 b, vec3 c, vec3 d ) {
         return a + b*cos( 6.28318*(c*t+d) );
     }
@@ -152,28 +177,35 @@ const fsSource = `#version 300 es
                 z_y = vec2(0.0);
             }
             
-            for (int i = 0; i < 10000; i++) {
+            for (int i = 0; i < 10000; i += 5) {
                 if (i >= u_maxIterations) break;
                 
-                vec2 z_x2 = ds_mul(z_x, z_x);
-                vec2 z_y2 = ds_mul(z_y, z_y);
-                
-                if (z_x2.x + z_y2.x > 4.0) {
-                    escaped = true;
-                    iterations = float(i);
-                    log_zn = log2(z_x2.x + z_y2.x) / 2.0;
-                    break;
+                // Unrolled Loop (5x)
+                for (int j = 0; j < 5; j++) {
+                    if (i + j >= u_maxIterations) break;
+
+                    vec2 z_x2 = ds_sqr(z_x);
+                    vec2 z_y2 = ds_sqr(z_y);
+                    
+                    if (z_x2.x + z_y2.x > 4.0) {
+                        escaped = true;
+                        iterations = float(i + j);
+                        log_zn = log2(z_x2.x + z_y2.x) / 2.0;
+                        // Break out of inner loop
+                        i = 10000; // Force outer break
+                        break;
+                    }
+
+                    vec2 z_xy = ds_mul(z_x, z_y);
+                    vec2 two_z_xy = ds_add(z_xy, z_xy);
+                    vec2 new_y = ds_add(two_z_xy, c_y);
+
+                    vec2 diff_sq = ds_sub(z_x2, z_y2);
+                    vec2 new_x = ds_add(diff_sq, c_x);
+
+                    z_x = new_x;
+                    z_y = new_y;
                 }
-
-                vec2 z_xy = ds_mul(z_x, z_y);
-                vec2 two_z_xy = ds_add(z_xy, z_xy); // Optimization: add instead of mul by 2
-                vec2 new_y = ds_add(two_z_xy, c_y);
-
-                vec2 diff_sq = ds_sub(z_x2, z_y2);
-                vec2 new_x = ds_add(diff_sq, c_x);
-
-                z_x = new_x;
-                z_y = new_y;
             }
         } else {
             vec2 c, z;
@@ -297,7 +329,7 @@ function getScreenContext() {
 let state = {
     zoomCenter: { x: -0.74364388703, y: 0.1318259042 }, // Start at Seahorse Valley
     zoomSize: 3.0,
-    maxIterations: 500,
+    maxIterations: getScreenContext().isMobile ? 300 : 500, // Lower default for mobile, but adjustable
     paletteId: 0,
     isDragging: false,
     lastMouse: { x: 0, y: 0 },
