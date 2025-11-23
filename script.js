@@ -1,12 +1,12 @@
 // Shaders
-const vsSource = `
-    attribute vec4 aVertexPosition;
+const vsSource = `#version 300 es
+    in vec4 aVertexPosition;
     void main() {
         gl_Position = aVertexPosition;
     }
 `;
 
-const fsSource = `
+const fsSource = `#version 300 es
     precision highp float;
 
     uniform vec2 u_resolution;
@@ -22,6 +22,9 @@ const fsSource = `
     // New Uniforms
     uniform int u_fractalType; // 0: Mandelbrot, 1: Julia, 2: Bifurcation
     uniform vec2 u_juliaC;
+
+    // Output color
+    out vec4 outColor;
 
     // Emulated double math functions
     vec2 ds_add(vec2 dsa, vec2 dsb) {
@@ -117,12 +120,12 @@ const fsSource = `
             
             // Coloring based on trap distance
             float t = 0.5 + 0.5 * sin(d * 4.0 + float(u_paletteId));
-            vec4 color = texture2D(u_paletteTexture, vec2(t, 0.0));
+            vec4 color = texture(u_paletteTexture, vec2(t, 0.0));
             
             // Make background black-ish
             if (length(z) > 2.0) color *= 0.0;
             
-            gl_FragColor = color;
+            outColor = color;
             return;
         }
 
@@ -162,9 +165,8 @@ const fsSource = `
                     break;
                 }
 
-                vec2 two = vec2(2.0, 0.0);
                 vec2 z_xy = ds_mul(z_x, z_y);
-                vec2 two_z_xy = ds_mul(two, z_xy);
+                vec2 two_z_xy = ds_add(z_xy, z_xy); // Optimization: add instead of mul by 2
                 vec2 new_y = ds_add(two_z_xy, c_y);
 
                 vec2 diff_sq = ds_sub(z_x2, z_y2);
@@ -191,7 +193,7 @@ const fsSource = `
                     if (c.x < p - 2.0 * p * p + 0.25) {
                         iterations = float(u_maxIterations);
                         // Skip loop
-                        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        outColor = vec4(0.0, 0.0, 0.0, 1.0);
                         return;
                     } 
                 }
@@ -233,7 +235,7 @@ const fsSource = `
             } else if (u_paletteId == 4) {
                 // Extreme (Texture)
                 float cycle = mod(smooth_i, 512.0) / 512.0;
-                color = texture2D(u_paletteTexture, vec2(cycle, 0.5)).rgb;
+                color = texture(u_paletteTexture, vec2(cycle, 0.5)).rgb;
             } else if (u_paletteId == 5) {
                 // Neon Nights
                 color = palette(t * 4.0, vec3(0.5), vec3(0.5), vec3(1.0), vec3(0.3, 0.2, 0.2));
@@ -254,16 +256,22 @@ const fsSource = `
                 color = palette(t * 8.0, vec3(0.2, 0.7, 0.4), vec3(0.5, 0.2, 0.3), vec3(1.0), vec3(0.0, 0.1, 0.0));
             }
             
-            gl_FragColor = vec4(color, 1.0);
+            outColor = vec4(color, 1.0);
         } else {
-            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+            outColor = vec4(0.0, 0.0, 0.0, 1.0);
         }
     }
 `;
 
 // Main Logic
 const canvas = document.getElementById('glCanvas');
-const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
+const gl = canvas.getContext('webgl2', {
+    preserveDrawingBuffer: false, // Optimization: Don't keep buffer
+    alpha: false, // Optimization: No transparency needed
+    antialias: false, // Optimization: We do our own rendering
+    depth: false, // Optimization: No depth buffer needed
+    stencil: false // Optimization: No stencil buffer needed
+});
 
 if (!gl) {
     alert('Unable to initialize WebGL. Your browser or machine may not support it.');
@@ -308,7 +316,8 @@ let state = {
     juliaC: { x: -0.7269, y: 0.1889 },
     circleDrag: { active: false, startX: 0, startY: 0, startIter: 0 },
     pendingInteraction: null, // For RAF-throttled interactions
-    interactionRAF: null // Track RAF ID for interactions
+    interactionRAF: null, // Track RAF ID for interactions
+    pendingScreenshot: false // New flag for screenshot handling
 };
 
 const locations = {
@@ -615,7 +624,7 @@ function drawScene(timestamp) {
     // Smooth interpolation
     if (!state.isAnimating) {
         const lerpFactor = 1.0 - Math.pow(0.1, deltaTime * 10);
-        
+
         // Apply smooth zoom limit at 0.5x (zoomSize = 6.0)
         const maxZoomSize = 6.0;
         if (state.targetZoomSize > maxZoomSize) {
@@ -625,12 +634,12 @@ function drawScene(timestamp) {
             state.targetZoomCenter.x = 0.75;
             state.targetZoomCenter.y = 0.0;
         }
-        
+
         // Single lerp calculation for all axes
         const diffSize = state.targetZoomSize - state.zoomSize;
         const diffX = state.targetZoomCenter.x - state.zoomCenter.x;
         const diffY = state.targetZoomCenter.y - state.zoomCenter.y;
-        
+
         state.zoomSize += diffSize * lerpFactor;
         state.zoomCenter.x += diffX * lerpFactor;
         state.zoomCenter.y += diffY * lerpFactor;
@@ -677,13 +686,28 @@ function drawScene(timestamp) {
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
+    // Handle screenshot if pending (must be done immediately after draw)
+    if (state.pendingScreenshot) {
+        state.pendingScreenshot = false;
+        try {
+            const link = document.createElement('a');
+            link.download = `fractonaut_${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } catch (e) {
+            console.error('Screenshot failed:', e);
+        }
+    }
+
     updateStats();
     requestAnimationFrame(drawScene);
 }
 
 function resizeCanvasToDisplaySize(canvas) {
-    const displayWidth = canvas.clientWidth;
-    const displayHeight = canvas.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth = Math.round(canvas.clientWidth * dpr);
+    const displayHeight = Math.round(canvas.clientHeight * dpr);
+
     if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
         canvas.width = displayWidth;
         canvas.height = displayHeight;
@@ -721,10 +745,10 @@ function renderCatalogue() {
     allLocations.forEach(loc => {
         const item = document.createElement('div');
         item.className = 'catalogue-item';
-        
+
         // Check if this is a saved location (has an id that's a timestamp string)
         const isSavedLocation = savedLocations.some(saved => saved.id === loc.id);
-        
+
         item.innerHTML = `
             <div class="catalogue-item-content">
                 <h4>${loc.title}</h4>
@@ -752,13 +776,13 @@ function renderCatalogue() {
                 </div>
             ` : ''}
         `;
-        
+
         // Main click to start journey
         const contentDiv = item.querySelector('.catalogue-item-content');
         if (contentDiv) {
             contentDiv.onclick = () => startHypnoticJourney(loc);
         }
-        
+
         // Share button handler
         const shareBtn = item.querySelector('.share-btn');
         if (shareBtn) {
@@ -767,7 +791,7 @@ function renderCatalogue() {
                 shareLocation(loc);
             });
         }
-        
+
         // Delete button handler
         const deleteBtn = item.querySelector('.delete-btn');
         if (deleteBtn) {
@@ -776,7 +800,7 @@ function renderCatalogue() {
                 deleteLocation(loc.id);
             });
         }
-        
+
         container.appendChild(item);
     });
 }
@@ -884,7 +908,7 @@ function startHypnoticJourney(loc) {
 
     function animate() {
         if (!state.isAnimating) return; // Safety check
-        
+
         const now = Date.now();
         const elapsed = (now - startTime) / 1000;
         const t = Math.min(elapsed / duration, 1.0);
@@ -916,7 +940,7 @@ function startHypnoticJourney(loc) {
             state.targetZoomCenter.y = loc.y;
             state.zoomCenter.x = loc.x;
             state.zoomCenter.y = loc.y;
-            
+
             // Use requestAnimationFrame to ensure drawScene processes final frame first
             requestAnimationFrame(() => {
                 state.isAnimating = false;
@@ -939,7 +963,7 @@ function startHypnoticJourney(loc) {
 function showShareButtonPopup(loc) {
     const popup = document.getElementById('shareButtonPopup');
     const shareBtn = document.getElementById('shareLocationBtn');
-    
+
     // Generate share URL
     const zoom = loc.zoom || (3.0 / state.zoomSize);
     const params = new URLSearchParams({
@@ -1024,12 +1048,13 @@ function handleZoom(delta, x, y) {
     const zoomFactor = 1.0 + (baseFactor * speedMultiplier) * Math.pow(state.targetZoomSize, 0.3);
 
     if (x === undefined || y === undefined) {
-        x = canvas.width / 2;
-        y = canvas.height / 2;
+        x = canvas.clientWidth / 2;
+        y = canvas.clientHeight / 2;
     }
 
-    const uvx = (x - canvas.width / 2) / canvas.height;
-    const uvy = (canvas.height - y - canvas.height / 2) / canvas.height;
+    // Use client dimensions (CSS pixels) because x/y are in CSS pixels
+    const uvx = (x - canvas.clientWidth / 2) / canvas.clientHeight;
+    const uvy = (canvas.clientHeight - y - canvas.clientHeight / 2) / canvas.clientHeight;
 
     const wx = state.targetZoomCenter.x + uvx * state.targetZoomSize;
     const wy = state.targetZoomCenter.y + uvy * state.targetZoomSize;
@@ -1047,7 +1072,7 @@ function handleZoom(delta, x, y) {
         const excess = state.targetZoomSize - maxZoomSize;
         const resistance = 1.0 / (1.0 + excess * 0.5);
         state.targetZoomSize = maxZoomSize + excess * resistance;
-        
+
         // Snap center to (0.75, 0) when at limit
         state.targetZoomCenter.x = 0.75;
         state.targetZoomCenter.y = 0.0;
@@ -1226,7 +1251,7 @@ function initSaveSystem() {
 
             // Show modal
             modal.classList.remove('hidden');
-            
+
             // Focus on name input and open keyboard (mobile)
             setTimeout(() => {
                 nameInput.focus();
@@ -1292,7 +1317,7 @@ function showAddLocationModal(params) {
     // Handle confirm
     confirmBtn.onclick = () => {
         modal.classList.add('hidden');
-        
+
         // Save location to localStorage
         const newLoc = {
             id: Date.now().toString(),
@@ -1373,34 +1398,34 @@ function calculateDurationFromZoom(zoom) {
     // 2. Logarithmic scaling matches exponential nature of zoom
     // 3. Deeper zooms need more time for detail rendering
     // 4. Capped at reasonable maximum to avoid excessive wait times
-    
+
     // Constants for smooth animation
     const TARGET_FPS = 60; // Standard GPU frame rate for smooth animation
     const MIN_DURATION = 4.0; // Minimum seconds for smooth shallow zoom (240 frames)
     const MAX_DURATION = 60.0; // Maximum seconds for very deep zooms (3600 frames)
-    
+
     // Clamp zoom to reasonable range (1x to 100,000x)
     const clampedZoom = Math.max(1.0, Math.min(zoom, 100000.0));
-    
+
     // Use logarithmic scaling since zoom is exponential
     // log10(zoom) converts exponential zoom to linear scale
     // Example: zoom 1x → log=0, zoom 10x → log=1, zoom 100x → log=2, zoom 1000x → log=3
     const logZoom = Math.log10(clampedZoom);
-    
+
     // Normalize log zoom to 0-1 range
     // log10(1) = 0, log10(100000) ≈ 5
     const logMin = 0;
     const logMax = 5;
     const normalizedLog = Math.min(1.0, (logZoom - logMin) / (logMax - logMin));
-    
+
     // Apply smooth easing curve for natural feel
     // Quadratic easing: slower start, faster end (feels more natural for deep zooms)
     const easedNormalized = normalizedLog * normalizedLog;
-    
+
     // Calculate duration: linear interpolation between min and max
     // Formula: duration = MIN + (eased * (MAX - MIN))
     const duration = MIN_DURATION + (easedNormalized * (MAX_DURATION - MIN_DURATION));
-    
+
     // Round to nearest 0.5 seconds for cleaner UI values
     return Math.round(duration * 2) / 2;
 }
@@ -1623,7 +1648,7 @@ canvas.addEventListener('touchmove', (e) => {
                         const excess = state.targetZoomSize - maxZoomSize;
                         const resistance = 1.0 / (1.0 + excess * 0.5);
                         state.targetZoomSize = maxZoomSize + excess * resistance;
-                        
+
                         // Snap center to (0.75, 0) when at limit
                         state.targetZoomCenter.x = 0.75;
                         state.targetZoomCenter.y = 0.0;
@@ -1695,10 +1720,10 @@ document.querySelectorAll('.palette-card').forEach(btn => {
 // Reset function (shared by both reset buttons)
 function resetView() {
     state.velocity = { x: 0, y: 0 };
-    
+
     // Randomly select palette (0-9, 10 palettes total)
     state.paletteId = Math.floor(Math.random() * 10);
-    
+
     // Randomly select complexity based on fractal type
     if (state.fractalType === 2) { // Sierpinski
         state.targetZoomCenter = { x: 0.5, y: 0.288 };
@@ -1731,7 +1756,7 @@ function resetView() {
     const iterValueEl = document.getElementById('iterValue');
     if (iterationsEl) iterationsEl.value = state.maxIterations;
     if (iterValueEl) iterValueEl.innerText = state.maxIterations;
-    
+
     // Update palette UI to show random selection
     document.querySelectorAll('.palette-card').forEach(c => c.classList.remove('active'));
     const selectedPaletteBtn = document.querySelector(`.palette-card[data-palette="${state.paletteId}"]`);
@@ -1755,10 +1780,7 @@ if (resetButton) {
 const screenshotBtn = document.getElementById('screenshotBtn');
 if (screenshotBtn) {
     screenshotBtn.addEventListener('click', () => {
-        const link = document.createElement('a');
-        link.download = `mandelbrot - ${Date.now()}.png`;
-        link.href = canvas.toDataURL();
-        link.click();
+        state.pendingScreenshot = true;
     });
 }
 
@@ -1869,14 +1891,14 @@ function markAppInstalled() {
 function wasAppUninstalled() {
     const wasInstalled = localStorage.getItem('pwa_installed') === 'true';
     const isCurrentlyInstalled = isAppInstalled();
-    
+
     // If it was installed but is no longer in standalone mode, it was uninstalled
     if (wasInstalled && !isCurrentlyInstalled) {
         // Clear the installed flag so we can show prompt again
         localStorage.removeItem('pwa_installed');
         return true;
     }
-    
+
     return false;
 }
 
