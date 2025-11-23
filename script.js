@@ -704,7 +704,12 @@ function drawScene(timestamp) {
 }
 
 function resizeCanvasToDisplaySize(canvas) {
-    const dpr = window.devicePixelRatio || 1;
+    // Cap DPR to ensure performance on high-res mobile screens
+    // 3x rendering is overkill for this shader and causes stutter
+    const screenCtx = getScreenContext();
+    const maxDpr = screenCtx.isMobile ? 1.5 : 2.0;
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
+
     const displayWidth = Math.round(canvas.clientWidth * dpr);
     const displayHeight = Math.round(canvas.clientHeight * dpr);
 
